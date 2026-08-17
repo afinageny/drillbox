@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # FreeCAD 1.1: parametric plate with N holes along the center
-# and four wall-mount slots (stadium = box + two cylinders).
+# and four wall-mount lugs outside the rectangle.
 # Parameters live on the Params VarSet. Change them, then recompute.
 
 import math
@@ -11,6 +11,41 @@ import Part
 import Sketcher
 
 OUT = r"C:\Users\vofka\dev\freecad\drillbox\rect-n-holes.FCStd"
+
+
+def add_ear(body, name, along_edge_x, sign):
+    """Rectangular lug outside the plate. Size (L+2W) x 2W, W = MountWidth."""
+    ear = body.newObject("PartDesign::AdditiveBox", name)
+    ear.setExpression("Height", "Params.Thickness")
+    if along_edge_x:
+        ear.setExpression("Length", "Params.MountLength + 2 * Params.MountWidth")
+        ear.setExpression("Width", "2 * Params.MountWidth")
+        ear.setExpression(
+            "Placement.Base.x",
+            "-(Params.MountLength + 2 * Params.MountWidth) / 2",
+        )
+        if sign > 0:
+            ear.setExpression("Placement.Base.y", "Params.Height / 2")
+        else:
+            ear.setExpression(
+                "Placement.Base.y",
+                "-Params.Height / 2 - 2 * Params.MountWidth",
+            )
+    else:
+        ear.setExpression("Length", "2 * Params.MountWidth")
+        ear.setExpression("Width", "Params.MountLength + 2 * Params.MountWidth")
+        if sign > 0:
+            ear.setExpression("Placement.Base.x", "Params.Width / 2")
+        else:
+            ear.setExpression(
+                "Placement.Base.x",
+                "-Params.Width / 2 - 2 * Params.MountWidth",
+            )
+        ear.setExpression(
+            "Placement.Base.y",
+            "-(Params.MountLength + 2 * Params.MountWidth) / 2",
+        )
+    return ear
 
 
 def add_slot_cut(body, name, x_expr, y_expr, along_x):
@@ -53,6 +88,21 @@ def add_slot_cut(body, name, x_expr, y_expr, along_x):
     return last
 
 
+def vertical_thickness_edges(shape, thickness, tol=1e-3):
+    """Edge names of vertical outline edges (length = plate thickness)."""
+    names = []
+    for i, edge in enumerate(shape.Edges, start=1):
+        if abs(edge.Length - thickness) > tol:
+            continue
+        verts = edge.Vertexes
+        if len(verts) != 2:
+            continue
+        a, b = verts[0].Point, verts[1].Point
+        if abs(a.x - b.x) < tol and abs(a.y - b.y) < tol and abs(a.z - b.z) > tol:
+            names.append("Edge%d" % i)
+    return names
+
+
 doc = App.newDocument("RectNHoles")
 
 params = doc.addObject("App::VarSet", "Params")
@@ -86,6 +136,13 @@ params.addProperty(
 params.MarginY = "20 mm"
 params.addProperty("App::PropertyLength", "Thickness", "Plate", "Толщина пластины")
 params.Thickness = "10 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "Fillet",
+    "Plate",
+    "Радиус скругления углов пластины и ушек",
+)
+params.Fillet = "6 mm"
 params.addProperty("App::PropertyLength", "Width", "Plate", "Ширина (считается)")
 params.addProperty("App::PropertyLength", "Height", "Plate", "Высота (считается)")
 params.addProperty(
@@ -147,6 +204,24 @@ pad.setExpression("Length", "Params.Thickness")
 doc.recompute()
 print("pad", pad.getStatusString(), "vol", pad.Shape.Volume if not pad.Shape.isNull() else None)
 
+add_ear(body, "EarTop", True, 1)
+add_ear(body, "EarBot", True, -1)
+add_ear(body, "EarLeft", False, -1)
+last_ear = add_ear(body, "EarRight", False, 1)
+last_ear.Refine = True
+doc.recompute()
+
+th = float(params.Thickness)
+base = body.Tip
+edge_names = vertical_thickness_edges(base.Shape, th)
+print("fillet edges", len(edge_names), edge_names)
+fillet = body.newObject("PartDesign::Fillet", "Fillet")
+fillet.Base = (base, edge_names)
+fillet.setExpression("Radius", "Params.Fillet")
+body.Tip = fillet
+doc.recompute()
+print("fillet", fillet.getStatusString(), "vol", fillet.Shape.Volume if not fillet.Shape.isNull() else None)
+
 holes = body.newObject("Sketcher::SketchObject", "SketchHole")
 
 r = float(params.Diameter) / 2.0
@@ -180,10 +255,11 @@ body.Tip = pattern
 doc.recompute()
 print("pattern", pattern.getStatusString(), "vol", pattern.Shape.Volume)
 
-top_y = "Params.Height / 2 - Params.MarginY / 2"
-bot_y = "-(Params.Height / 2 - Params.MarginY / 2)"
-left_x = "-(Params.Width / 2 - Params.MarginX / 2)"
-right_x = "Params.Width / 2 - Params.MarginX / 2"
+# Hole sits in the middle of each ear.
+top_y = "Params.Height / 2 + Params.MountWidth"
+bot_y = "-(Params.Height / 2 + Params.MountWidth)"
+left_x = "-(Params.Width / 2 + Params.MountWidth)"
+right_x = "Params.Width / 2 + Params.MountWidth"
 
 add_slot_cut(body, "MountTop", "0 mm", top_y, True)
 add_slot_cut(body, "MountBot", "0 mm", bot_y, True)
@@ -195,11 +271,17 @@ print("mount tip", body.Tip.Name, body.Tip.getStatusString())
 
 ml = float(params.MountLength)
 mw = float(params.MountWidth)
+fr = float(params.Fillet)
 slot_area = (ml - mw) * mw + math.pi * (mw / 2.0) ** 2
+ear_area = (ml + 2.0 * mw) * (2.0 * mw)
+# 12 convex corners lose (1-π/4)r², 8 concave junctions gain the same.
+corner = (1.0 - math.pi / 4.0) * fr * fr
 expected = float(params.Thickness) * (
     float(params.Width) * float(params.Height)
+    + 4.0 * ear_area
     - params.Count * math.pi * r * r
     - 4.0 * slot_area
+    - 4.0 * corner
 )
 print("Width", float(params.Width), "Height", float(params.Height))
 if not body.Shape.isNull():
@@ -213,7 +295,7 @@ plate.Visibility = False
 holes.Visibility = False
 for obj in doc.Objects:
     name = obj.Name
-    if name in ("Body", params.Name) or obj is body.Tip:
+    if name in ("Body", "LinearPattern", params.Name) or obj is body.Tip:
         obj.Visibility = True
     elif name.startswith("Sketch") or "Axis" in name or "Plane" in name or name.startswith("Origin"):
         obj.Visibility = False
@@ -226,51 +308,58 @@ try:
 except Exception:
     pass
 
-doc.saveAs(OUT)
-print("Saved", OUT)
-App.closeDocument(doc.Name)
+tip_name = body.Tip.Name
+visible_names = {"Body", "LinearPattern", tip_name}
 
-# FreeCADCmd does not write GuiDocument.xml, so the body would open hidden in the GUI.
-_gui = """<?xml version="1.0" encoding="utf-8"?>
+def _vp(name, visible, expanded=False, extra=""):
+    vis = "true" if visible else "false"
+    exp = "1" if expanded else "0"
+    extras = extra.strip()
+    props = [
+        """                <Property name="ShowInTree" type="App::PropertyBool" status="1">
+                    <Bool value="true"/>
+                </Property>""",
+        f"""                <Property name="Visibility" type="App::PropertyBool" status="1">
+                    <Bool value="{vis}"/>
+                </Property>""",
+    ]
+    if extras:
+        props.append("                " + extras)
+    count = 2 + (1 if extras else 0)
+    return (
+        f'        <ViewProvider name="{name}" expanded="{exp}" Extensions="True">\n'
+        f'            <Properties Count="{count}" TransientCount="0">\n'
+        + "\n".join(props)
+        + "\n            </Properties>\n        </ViewProvider>"
+    )
+
+body_extra = """<Property name="DisplayModeBody" type="App::PropertyEnumeration" status="1">
+                    <Integer value="1"/>
+                </Property>"""
+vp_blocks = []
+for obj in doc.Objects:
+    if obj.Name == "Body":
+        vp_blocks.append(_vp(obj.Name, True, expanded=True, extra=body_extra))
+    else:
+        vp_blocks.append(_vp(obj.Name, obj.Name in visible_names))
+
+_gui = f"""<?xml version="1.0" encoding="utf-8"?>
 <Document SchemaVersion="1" HasExpansion="1">
     <Expand count="1">
-        <Expand name="Body" count="0"></Expand>
+        <Expand name="Body" count="1">
+            <Expand name="{tip_name}"/>
+        </Expand>
     </Expand>
-    <ViewProviderData Count="2">
-        <ViewProvider name="Body" expanded="1" Extensions="True">
-            <Extensions Count="2">
-                <Extension type="Gui::ViewProviderOriginGroupExtension" name="ViewProviderOriginGroupExtension"></Extension>
-                <Extension type="Gui::ViewProviderFaceTexture" name="ViewProviderFaceTexture"></Extension>
-            </Extensions>
-            <Properties Count="4" TransientCount="0">
-                <Property name="DisplayModeBody" type="App::PropertyEnumeration" status="1">
-                    <Integer value="0"/>
-                </Property>
-                <Property name="ShowInTree" type="App::PropertyBool" status="1">
-                    <Bool value="true"/>
-                </Property>
-                <Property name="Transparency" type="App::PropertyPercent" status="1">
-                    <Integer value="0"/>
-                </Property>
-                <Property name="Visibility" type="App::PropertyBool" status="1">
-                    <Bool value="true"/>
-                </Property>
-            </Properties>
-        </ViewProvider>
-        <ViewProvider name="MountRightCylB" expanded="0" Extensions="True">
-            <Properties Count="2" TransientCount="0">
-                <Property name="ShowInTree" type="App::PropertyBool" status="1">
-                    <Bool value="true"/>
-                </Property>
-                <Property name="Visibility" type="App::PropertyBool" status="1">
-                    <Bool value="true"/>
-                </Property>
-            </Properties>
-        </ViewProvider>
+    <ViewProviderData Count="{len(vp_blocks)}">
+{chr(10).join(vp_blocks)}
     </ViewProviderData>
-    <Camera settings="OrthographicCamera { viewportMapping ADJUST_CAMERA position 0 -220 260 orientation 0.353553 0.146447 0.353553  1.2870022 nearDistance 50 farDistance 800 aspectRatio 1 focalDistance 340 height 420 }"/>
+    <Camera settings="OrthographicCamera {{ viewportMapping ADJUST_CAMERA position 0 -220 260 orientation 0.353553 0.146447 0.353553  1.2870022 nearDistance 50 farDistance 800 aspectRatio 1 focalDistance 340 height 420 }}"/>
 </Document>
 """
+
+doc.saveAs(OUT)
+print("Saved", OUT, "tip", tip_name)
+App.closeDocument(doc.Name)
 _tmp = OUT + ".tmp"
 with zipfile.ZipFile(OUT, "r") as zin, zipfile.ZipFile(_tmp, "w") as zout:
     for item in zin.infolist():
