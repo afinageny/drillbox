@@ -112,6 +112,55 @@ def _slot_and_thin_edges(shape, p, skip_boss_radius, want_slots):
     return picked
 
 
+def _plate_top_edges(shape, p, skip_boss_radius):
+    """Top outline of the thin plate. No mount-slot logic."""
+    ztop = _f(p.Thickness) / 2.0
+    skip_r = skip_boss_radius if skip_boss_radius else 0.0
+    picked = []
+    for edge in shape.Edges:
+        bb = edge.BoundBox
+        if abs(bb.ZMin - ztop) > 1e-3 or abs(bb.ZMax - ztop) > 1e-3:
+            continue
+        rad = getattr(getattr(edge, "Curve", None), "Radius", None)
+        if rad is not None and skip_r and abs(rad - skip_r) < 0.2:
+            continue
+        if _f(edge.Length) < 1.0:
+            continue
+        picked.append(edge)
+    return picked
+
+
+def _corner_hole_edges(shape, p):
+    """Top and bottom rims of the four corner screw holes."""
+    if not hasattr(p, "CornerHoleDiameter") or not hasattr(p, "CornerInset"):
+        return []
+    r = _f(p.CornerHoleDiameter) / 2.0
+    inset = _f(p.CornerInset)
+    hw = _f(p.Width) / 2.0
+    hh = _f(p.Height) / 2.0
+    ztop = _f(p.Thickness) / 2.0
+    centers = (
+        (hw - inset, hh - inset),
+        (hw - inset, -(hh - inset)),
+        (-(hw - inset), hh - inset),
+        (-(hw - inset), -(hh - inset)),
+    )
+    picked = []
+    for edge in shape.Edges:
+        rad = getattr(getattr(edge, "Curve", None), "Radius", None)
+        if rad is None or abs(_f(rad) - r) > 0.2:
+            continue
+        bb = edge.BoundBox
+        at_top = abs(bb.ZMin - ztop) < 1e-3 and abs(bb.ZMax - ztop) < 1e-3
+        at_bot = abs(bb.ZMin) < 1e-3 and abs(bb.ZMax) < 1e-3
+        if not at_top and not at_bot:
+            continue
+        mx, my = _mid(edge)
+        if any((mx - cx) ** 2 + (my - cy) ** 2 < 2.0 for cx, cy in centers):
+            picked.append(edge)
+    return picked
+
+
 def _select_edges(shape, obj, p):
     mode = obj.Mode
     if mode == "vertical":
@@ -145,6 +194,10 @@ def _select_edges(shape, obj, p):
         return _slot_and_thin_edges(shape, p, skip, True)
     if mode == "thin_top":
         return _slot_and_thin_edges(shape, p, skip, False)
+    if mode == "plate_top":
+        return _plate_top_edges(shape, p, skip)
+    if mode == "corner_holes":
+        return _corner_hole_edges(shape, p)
     return []
 
 
