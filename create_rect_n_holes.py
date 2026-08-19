@@ -6,17 +6,67 @@
 # Four small recessed crosses sit between each mount slot and the big holes
 # on drillTemplate. waterCover is a matching frame (inner rectangle cut
 # along the center-facing edges of those crosses) with the same lugs
-# and walls of height WallHeight along the inner window.
+# and walls of height WallHeight along the inner window, with a top
+# frame of width FrameWidth whose outer contour matches the walls.
+# Two G 1/2 (BSPP) wall holes sit in opposite +X and -Y walls, offset toward far corners.
+# Two hoseFitting bodies (G 1/2, barb 19/22 mm) stand beside the cover, thread down.
 # Parameters live on the Params VarSet. Change them, then recompute.
 
 import math
 import os
+import shutil
+import sys
 import zipfile
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
 import FreeCAD as App
 import Part
 import Sketcher
+import geom_fillet
 
 OUT = r"C:\Users\vofka\dev\freecad\drillbox\rect-n-holes.FCStd"
+
+# ISO 228 G 1/2 (BSPP). Pitch 14 TPI. Tap drill 19 mm.
+G12_PITCH = 1.814
+G12_MAJOR = 20.955
+G12_MINOR = 18.631
+COVER_X = "Params.Width + 4 * Params.MountWidth + Params.Margin"
+FITTING_HEX_H = 7.0
+FITTING_TOOTH = 4.5
+
+
+def _install_geom_fillet():
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    try:
+        mdir = App.getUserMacroDir(True)
+        shutil.copy2(os.path.join(here, "geom_fillet.py"), os.path.join(mdir, "geom_fillet.py"))
+    except Exception as exc:
+        print("install geom_fillet:", exc)
+
+
+def add_geom_fillet(body, name, source, radius_expr, mode, edge_len_expr=None, skip_boss=False):
+    obj = body.newObject("PartDesign::FeaturePython", name)
+    geom_fillet.GeomFillet(obj)
+    obj.Source = source
+    obj.Mode = mode
+    obj.setExpression("Radius", radius_expr)
+    if edge_len_expr:
+        obj.setExpression("EdgeLength", edge_len_expr)
+    obj.HasSkipBoss = bool(skip_boss)
+    if skip_boss:
+        obj.setExpression("SkipBossRadius", "Params.Diameter / 2 + Params.Rim")
+    vo = getattr(obj, "ViewObject", None)
+    if vo is not None:
+        vo.Proxy = 0
+    body.Tip = obj
+    doc.recompute()
+    print(name, obj.getStatusString())
+    return obj
 
 
 def add_ear(body, name, along_edge_x, sign):
@@ -286,16 +336,14 @@ def add_four_ears(body, prefix):
 
 
 def fillet_vertical(body, name):
-    base = body.Tip
-    edge_names = vertical_thickness_edges(base.Shape, float(params.Thickness) / 2.0)
-    print(name, "edges", len(edge_names), edge_names)
-    fillet = body.newObject("PartDesign::Fillet", name)
-    fillet.Base = (base, edge_names)
-    fillet.setExpression("Radius", "Params.Fillet")
-    body.Tip = fillet
-    doc.recompute()
-    print(name, fillet.getStatusString())
-    return fillet
+    return add_geom_fillet(
+        body,
+        name,
+        body.Tip,
+        "Params.Fillet",
+        "vertical",
+        "Params.Thickness / 2",
+    )
 
 
 def add_boss_and_holes(body, plate, prefix):
@@ -365,70 +413,23 @@ def add_four_mounts(body, prefix):
 
 
 def fillet_slots_and_outline(body, last_slot, skip_boss, prefix):
-    th = float(params.Thickness)
-    hh = float(params.Height) / 2.0
-    hw = float(params.Width) / 2.0
-    mw = float(params.MountWidth)
-    ef = float(params.EdgeFillet)
-    slot_off = mw / 2.0
-    slot_centers = (
-        (0.0, hh + slot_off),
-        (0.0, -(hh + slot_off)),
-        (-(hw + slot_off), 0.0),
-        (hw + slot_off, 0.0),
+    fillet_slots = add_geom_fillet(
+        body,
+        prefix + "FilletSlots",
+        last_slot,
+        "Params.EdgeFillet",
+        "slots",
+        skip_boss=bool(skip_boss),
     )
-
-    def _mid(edge):
-        bb = edge.BoundBox
-        return (bb.XMin + bb.XMax) / 2.0, (bb.YMin + bb.YMax) / 2.0
-
-    def _near_slot(edge, dist):
-        mx, my = _mid(edge)
-        return any((mx - sx) ** 2 + (my - sy) ** 2 < dist * dist for sx, sy in slot_centers)
-
-    slot_edges = []
-    for i, edge in enumerate(last_slot.Shape.Edges, start=1):
-        bb = edge.BoundBox
-        if abs(bb.ZMin - th / 2.0) > 1e-3 or abs(bb.ZMax - th / 2.0) > 1e-3:
-            continue
-        rad = getattr(getattr(edge, "Curve", None), "Radius", None)
-        if rad is not None and any(abs(rad - r) < 0.2 for r in skip_boss):
-            continue
-        name = "Edge%d" % i
-        if rad is not None and abs(rad - mw / 2.0) < 0.2:
-            slot_edges.append(name)
-        elif _near_slot(edge, mw / 2.0 + 0.5):
-            slot_edges.append(name)
-    print(prefix + "slot edges", len(slot_edges), slot_edges)
-    fillet_slots = body.newObject("PartDesign::Fillet", prefix + "FilletSlots")
-    fillet_slots.Base = (last_slot, slot_edges)
-    fillet_slots.setExpression("Radius", "Params.EdgeFillet")
-    body.Tip = fillet_slots
-    doc.recompute()
-    print(prefix + "FilletSlots", fillet_slots.getStatusString())
     fillet_base = fillet_slots if not fillet_slots.Shape.isNull() else last_slot
-    outer2 = []
-    for i, edge in enumerate(fillet_base.Shape.Edges, start=1):
-        bb = edge.BoundBox
-        if abs(bb.ZMin - th / 2.0) > 1e-3 or abs(bb.ZMax - th / 2.0) > 1e-3:
-            continue
-        if edge.Length < 1.0:
-            continue
-        rad = getattr(getattr(edge, "Curve", None), "Radius", None)
-        if rad is not None and any(abs(rad - r) < 0.2 for r in skip_boss):
-            continue
-        if rad is not None and abs(rad - mw / 2.0) < 0.2:
-            continue
-        if _near_slot(edge, mw / 2.0 + ef + 0.2):
-            continue
-        outer2.append("Edge%d" % i)
-    print(prefix + "thin outer", len(outer2), outer2)
-    fillet_top = body.newObject("PartDesign::Fillet", prefix + "FilletThin")
-    fillet_top.Base = (fillet_base, outer2)
-    fillet_top.setExpression("Radius", "Params.EdgeFillet")
-    body.Tip = fillet_top
-    doc.recompute()
-    print(prefix + "FilletThin", fillet_top.getStatusString())
+    fillet_top = add_geom_fillet(
+        body,
+        prefix + "FilletThin",
+        fillet_base,
+        "Params.EdgeFillet",
+        "thin_top",
+        skip_boss=bool(skip_boss),
+    )
     mark_base = fillet_top if not fillet_top.Shape.isNull() else fillet_base
     body.Tip = mark_base
     return mark_base
@@ -479,17 +480,9 @@ def add_frame_window(body, prefix):
     body.Tip = win
     doc.recompute()
     print(prefix + "Window", win.getStatusString())
-    hx = float(win.Length) / 2.0
-    hy = float(win.Width) / 2.0
-    corners = ((hx, hy), (hx, -hy), (-hx, hy), (-hx, -hy))
-    names = vertical_edges_near(win.Shape, corners, float(params.Thickness) / 2.0)
-    print(prefix + "window corners", len(names), names)
-    fillet = body.newObject("PartDesign::Fillet", prefix + "FilletWindow")
-    fillet.Base = (win, names)
-    fillet.setExpression("Radius", "Params.Fillet")
-    body.Tip = fillet
-    doc.recompute()
-    print(prefix + "FilletWindow", fillet.getStatusString())
+    fillet = add_geom_fillet(
+        body, prefix + "FilletWindow", win, "Params.Fillet", "window"
+    )
     return add_cover_walls(body, prefix)
 
 
@@ -509,18 +502,9 @@ def add_cover_walls(body, prefix):
     doc.recompute()
     print(prefix + "WallBlock", block.getStatusString())
 
-    h_wall = float(params.WallHeight)
-    hx = float(block.Length) / 2.0
-    hy = float(block.Width) / 2.0
-    outer_corners = ((hx, hy), (hx, -hy), (-hx, hy), (-hx, -hy))
-    outer_names = vertical_edges_near(block.Shape, outer_corners, h_wall)
-    print(prefix + "wall outer", len(outer_names), outer_names)
-    fillet_out = body.newObject("PartDesign::Fillet", prefix + "FilletWallOuter")
-    fillet_out.Base = (block, outer_names)
-    fillet_out.setExpression("Radius", "Params.Fillet + Params.WallThickness")
-    body.Tip = fillet_out
-    doc.recompute()
-    print(prefix + "FilletWallOuter", fillet_out.getStatusString())
+    fillet_out = add_geom_fillet(
+        body, prefix + "FilletWallOuter", block, "Params.Fillet", "wall_outer"
+    )
 
     cut = body.newObject("PartDesign::SubtractiveBox", prefix + "WallWindow")
     cut.setExpression("Length", WINDOW_LEN)
@@ -534,18 +518,281 @@ def add_cover_walls(body, prefix):
     doc.recompute()
     print(prefix + "WallWindow", cut.getStatusString())
 
-    hx_in = float(cut.Length) / 2.0
-    hy_in = float(cut.Width) / 2.0
-    inner_corners = ((hx_in, hy_in), (hx_in, -hy_in), (-hx_in, hy_in), (-hx_in, -hy_in))
-    inner_names = vertical_edges_near(cut.Shape, inner_corners, h_wall)
-    print(prefix + "wall inner", len(inner_names), inner_names)
-    fillet_in = body.newObject("PartDesign::Fillet", prefix + "FilletWallInner")
-    fillet_in.Base = (cut, inner_names)
-    fillet_in.setExpression("Radius", "Params.Fillet")
-    body.Tip = fillet_in
+    fillet_in = add_geom_fillet(
+        body, prefix + "FilletWallInner", cut, "Params.Fillet", "wall_inner"
+    )
+    return add_cover_frame(body, prefix)
+
+
+def add_cover_frame(body, prefix):
+    """Rim on top of the walls. Outer corners use Fillet; inner corners use Diameter/2."""
+    outer_len = "(" + WINDOW_LEN + ") + 2 * Params.WallThickness"
+    outer_wid = "(" + WINDOW_WID + ") + 2 * Params.WallThickness"
+    inner_len = "(" + outer_len + ") - 2 * Params.FrameWidth"
+    inner_wid = "(" + outer_wid + ") - 2 * Params.FrameWidth"
+    z0 = "Params.Thickness / 2 + Params.WallHeight"
+
+    block = body.newObject("PartDesign::AdditiveBox", prefix + "FrameBlock")
+    block.setExpression("Length", outer_len)
+    block.setExpression("Width", outer_wid)
+    block.setExpression("Height", "Params.WallThickness")
+    block.setExpression("Placement.Base.x", "-(" + outer_len + ") / 2")
+    block.setExpression("Placement.Base.y", "-(" + outer_wid + ") / 2")
+    block.setExpression("Placement.Base.z", z0)
+    block.Refine = True
+    body.Tip = block
     doc.recompute()
-    print(prefix + "FilletWallInner", fillet_in.getStatusString())
-    return fillet_in
+    print(prefix + "FrameBlock", block.getStatusString())
+
+    fillet_out = add_geom_fillet(
+        body, prefix + "FilletFrameOuter", block, "Params.Fillet", "frame_outer"
+    )
+
+    cut = body.newObject("PartDesign::SubtractiveBox", prefix + "FrameWindow")
+    cut.setExpression("Length", inner_len)
+    cut.setExpression("Width", inner_wid)
+    cut.setExpression("Height", "Params.WallThickness")
+    cut.setExpression("Placement.Base.x", "-(" + inner_len + ") / 2")
+    cut.setExpression("Placement.Base.y", "-(" + inner_wid + ") / 2")
+    cut.setExpression("Placement.Base.z", z0)
+    cut.Refine = True
+    body.Tip = cut
+    doc.recompute()
+    print(prefix + "FrameWindow", cut.getStatusString())
+
+    fillet_in = add_geom_fillet(
+        body,
+        prefix + "FilletFrameInner",
+        cut,
+        "Params.Diameter / 2",
+        "frame_inner",
+    )
+    return add_cover_wall_holes(body, prefix)
+
+
+def add_cover_wall_holes(body, prefix):
+    """G 1/2 BSPP holes with outer bosses, mid-height, halfway to the far edges."""
+    z_expr = "Params.Thickness / 2 + Params.WallHeight / 2"
+    last = None
+    # along_x: hole in +X wall (YZ plane). Else hole in -Y wall (XZ plane).
+    specs = (
+        (
+            prefix + "HoleYZ",
+            True,
+            body.Origin.OriginFeatures[5],
+            "(" + WINDOW_LEN + ") / 2 + Params.WallThickness + Params.ThreadBossLength",
+            "Params.Height / 4",
+            "(" + WINDOW_LEN + ") / 2 + Params.WallThickness",
+            "Params.Height / 4",
+        ),
+        (
+            prefix + "HoleXZ",
+            False,
+            body.Origin.OriginFeatures[4],
+            "(" + WINDOW_WID + ") / 2 + Params.WallThickness + Params.ThreadBossLength",
+            "-Params.Width / 4",
+            "-(" + WINDOW_WID + ") / 2 - Params.WallThickness",
+            "-Params.Width / 4",
+        ),
+    )
+    for name, along_x, plane, sketch_z, sketch_x, boss_along, boss_cross in specs:
+        boss = body.newObject("PartDesign::AdditiveCylinder", name + "Boss")
+        boss.setExpression("Radius", "Params.ThreadBossDiameter / 2")
+        boss.setExpression("Height", "Params.ThreadBossLength")
+        boss.setExpression("Placement.Base.z", z_expr)
+        if along_x:
+            boss.Placement.Rotation = App.Rotation(App.Vector(0, 1, 0), 90)
+            boss.setExpression("Placement.Base.x", boss_along)
+            boss.setExpression("Placement.Base.y", boss_cross)
+        else:
+            boss.Placement.Rotation = App.Rotation(App.Vector(1, 0, 0), 90)
+            boss.setExpression("Placement.Base.x", boss_cross)
+            boss.setExpression("Placement.Base.y", boss_along)
+        body.Tip = boss
+        doc.recompute()
+        print(name + "Boss", boss.getStatusString())
+
+        sk = body.newObject("Sketcher::SketchObject", name + "Sketch")
+        sk.AttachmentSupport = [(plane, "")]
+        sk.MapMode = "FlatFace"
+        sk.setExpression("AttachmentOffset.Base.z", sketch_z)
+        doc.recompute()
+        cx = float(params.Height) / 4.0 if along_x else -float(params.Width) / 4.0
+        cz = float(params.Thickness) / 2.0 + float(params.WallHeight) / 2.0
+        g = sk.addGeometry(Part.Circle(App.Vector(cx, cz, 0), App.Vector(0, 0, 1), 5), False)
+        c_x = sk.addConstraint(Sketcher.Constraint("DistanceX", g, 3, cx))
+        c_y = sk.addConstraint(Sketcher.Constraint("DistanceY", g, 3, cz))
+        sk.renameConstraint(c_x, "CenterX")
+        sk.renameConstraint(c_y, "CenterY")
+        sk.setExpression("Constraints.CenterX", sketch_x)
+        sk.setExpression("Constraints.CenterY", z_expr)
+        doc.recompute()
+        print(name + "Sketch", sk.FullyConstrained, sk.getStatusString())
+
+        hole = body.newObject("PartDesign::Hole", name)
+        hole.Profile = sk
+        hole.Threaded = True
+        hole.ThreadType = "BSP"
+        hole.ThreadSize = "1/2"
+        hole.ModelThread = True
+        hole.Tapered = False
+        hole.DepthType = "Dimension"
+        hole.DrillPoint = "Flat"
+        hole.setExpression("Depth", "Params.WallThickness + Params.ThreadBossLength")
+        last = hole
+        body.Tip = hole
+        doc.recompute()
+        print(name, hole.getStatusString(), "dia", float(hole.Diameter))
+    last.Refine = True
+    body.Tip = last
+    doc.recompute()
+    return last
+
+
+def _add_closed_polyline(sk, pts):
+    geos = []
+    n = len(pts)
+    for i in range(n):
+        a = pts[i]
+        b = pts[(i + 1) % n]
+        geos.append(
+            sk.addGeometry(
+                Part.LineSegment(App.Vector(a[0], a[1], 0), App.Vector(b[0], b[1], 0)),
+                False,
+            )
+        )
+    sk.addConstraint(
+        [Sketcher.Constraint("Coincident", geos[i], 2, geos[(i + 1) % n], 1) for i in range(n)]
+    )
+    return geos
+
+
+def _barb_teeth(diameter, z0, n=3, step=FITTING_TOOTH):
+    ridge = diameter / 2.0 + 0.7
+    root = diameter / 2.0 - 0.9
+    pts = [(root, z0)]
+    z = z0
+    for _ in range(n):
+        pts.append((ridge, z + 1.1))
+        z += step
+        pts.append((root, z))
+    return pts, z
+
+
+def build_hose_fitting(body):
+    """G 1/2 male fitting: thread -Z, hex at z=0, 22/19 mm barbs +Z."""
+    thread_len = float(params.WallThickness) + float(params.ThreadBossLength)
+    d22 = float(params.FittingBarb22)
+    d19 = float(params.FittingBarb19)
+    bore = float(params.FittingBore)
+    af = float(params.FittingHex)
+
+    hex_sk = body.newObject("Sketcher::SketchObject", "SketchHex")
+    hex_sk.AttachmentSupport = [(body.Origin.OriginFeatures[3], "")]
+    hex_sk.MapMode = "FlatFace"
+    doc.recompute()
+    rv = af / math.sqrt(3.0)
+    hex_pts = []
+    for i in range(6):
+        ang = math.radians(30.0 + i * 60.0)
+        hex_pts.append((rv * math.cos(ang), rv * math.sin(ang)))
+    _add_closed_polyline(hex_sk, hex_pts)
+    doc.recompute()
+    hex_pad = body.newObject("PartDesign::Pad", "Hex")
+    hex_pad.Profile = hex_sk
+    hex_pad.Length = FITTING_HEX_H
+    body.Tip = hex_pad
+    doc.recompute()
+    print(body.Name, "Hex", hex_pad.getStatusString())
+
+    core = body.newObject("PartDesign::AdditiveCylinder", "ThreadCore")
+    core.Radius = G12_MINOR / 2.0
+    core.setExpression("Height", "Params.WallThickness + Params.ThreadBossLength")
+    core.setExpression(
+        "Placement.Base.z",
+        "-(Params.WallThickness + Params.ThreadBossLength)",
+    )
+    body.Tip = core
+    doc.recompute()
+    print(body.Name, "ThreadCore", core.getStatusString())
+
+    skt = body.newObject("Sketcher::SketchObject", "SketchThread")
+    skt.AttachmentSupport = [(body.Origin.OriginFeatures[4], "")]
+    skt.MapMode = "FlatFace"
+    skt.setExpression(
+        "AttachmentOffset.Base.y",
+        "-(Params.WallThickness + Params.ThreadBossLength)",
+    )
+    doc.recompute()
+    rin = G12_MINOR / 2.0
+    rout = G12_MAJOR / 2.0
+    hb = 0.38 * G12_PITCH
+    _add_closed_polyline(
+        skt,
+        ((rin, hb), (rout, 0.0), (rin, -hb)),
+    )
+    doc.recompute()
+    helix = body.newObject("PartDesign::AdditiveHelix", "Thread")
+    helix.Profile = skt
+    helix.ReferenceAxis = (body.Origin.OriginFeatures[2], "")
+    helix.Mode = "pitch-height-angle"
+    helix.Pitch = G12_PITCH
+    helix.Angle = 0
+    helix.setExpression("Height", "Params.WallThickness + Params.ThreadBossLength")
+    body.Tip = helix
+    doc.recompute()
+    print(body.Name, "Thread", helix.getStatusString())
+
+    z0 = FITTING_HEX_H + 1.5
+    barb_pts = [(0.0, FITTING_HEX_H), (d22 / 2.0 - 0.4, FITTING_HEX_H)]
+    t22, z = _barb_teeth(d22, z0)
+    barb_pts.extend(t22)
+    t19, z = _barb_teeth(d19, z + 0.6)
+    barb_pts.extend(t19)
+    barb_pts.append((bore / 2.0 + 0.6, z + 3.0))
+    barb_pts.append((0.0, z + 3.0))
+    skb = body.newObject("Sketcher::SketchObject", "SketchBarb")
+    skb.AttachmentSupport = [(body.Origin.OriginFeatures[4], "")]
+    skb.MapMode = "FlatFace"
+    doc.recompute()
+    _add_closed_polyline(skb, barb_pts)
+    doc.recompute()
+    barb = body.newObject("PartDesign::Revolution", "Barb")
+    barb.Profile = skb
+    barb.ReferenceAxis = (body.Origin.OriginFeatures[2], "")
+    barb.Angle = 360
+    body.Tip = barb
+    doc.recompute()
+    print(body.Name, "Barb", barb.getStatusString())
+
+    hole = body.newObject("PartDesign::SubtractiveCylinder", "Bore")
+    hole.setExpression("Radius", "Params.FittingBore / 2")
+    hole.Height = thread_len + FITTING_HEX_H + 40.0
+    hole.setExpression(
+        "Placement.Base.z",
+        "-(Params.WallThickness + Params.ThreadBossLength) - 1 mm",
+    )
+    hole.Refine = True
+    body.Tip = hole
+    doc.recompute()
+    print(body.Name, "Bore", hole.getStatusString())
+    return hole
+
+
+def place_hose_fitting(body, slot):
+    """Stand next to the cover: thread down onto z=0, barb up."""
+    body.Placement.Rotation = App.Rotation()
+    body.setExpression(
+        "Placement.Base.z",
+        "Params.WallThickness + Params.ThreadBossLength",
+    )
+    body.setExpression(
+        "Placement.Base.x",
+        COVER_X
+        + " + Params.Width / 2 + 4 * Params.MountWidth + Params.Margin"
+        + (" + 40 mm" if slot else ""),
+    )
+    body.setExpression("Placement.Base.y", "0 mm")
 
 
 def build_part(body, prefix, with_holes, with_crosses=False, with_window=False):
@@ -569,6 +816,7 @@ def build_part(body, prefix, with_holes, with_crosses=False, with_window=False):
     return body.Tip
 
 
+_install_geom_fillet()
 doc = App.newDocument("DrillBox")
 
 params = doc.addObject("App::VarSet", "Params")
@@ -660,6 +908,62 @@ params.addProperty(
     "Толщина стенок waterCover",
 )
 params.WallThickness = "3 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FrameWidth",
+    "Cover",
+    "Ширина рамки поверх стенок waterCover",
+)
+params.FrameWidth = "10 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "WallHoleDiameter",
+    "Cover",
+    "Диаметр сверления под резьбу G 1/2 в стенках waterCover",
+)
+params.WallHoleDiameter = "19 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "ThreadBossLength",
+    "Cover",
+    "Длина бобышки под резьбу G 1/2 снаружи стенки",
+)
+params.ThreadBossLength = "8 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "ThreadBossDiameter",
+    "Cover",
+    "Диаметр бобышки под резьбу G 1/2",
+)
+params.ThreadBossDiameter = "32 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FittingBarb22",
+    "Fitting",
+    "Большая ступень ёлки штуцера (шланг 22 мм)",
+)
+params.FittingBarb22 = "22 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FittingBarb19",
+    "Fitting",
+    "Малая ступень ёлки штуцера (шланг 19 мм)",
+)
+params.FittingBarb19 = "19 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FittingBore",
+    "Fitting",
+    "Внутренний канал штуцера",
+)
+params.FittingBore = "12 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FittingHex",
+    "Fitting",
+    "Размер под ключ шестигранника штуцера",
+)
+params.FittingHex = "24 mm"
 params.setExpression("Width", "2 * Margin + Diameter + (Count - 1) * Offset")
 params.setExpression("Height", "2 * Margin + Diameter")
 doc.recompute()
@@ -675,8 +979,22 @@ doc.recompute()
 build_part(cover, "WC", with_holes=False, with_window=True)
 cover.setExpression(
     "Placement.Base.x",
-    "Params.Width + 4 * Params.MountWidth + Params.Margin",
+    COVER_X,
 )
+doc.recompute()
+
+fit_yz = doc.addObject("PartDesign::Body", "hoseFittingYZ")
+fit_yz.Label = "штуцер 1"
+doc.recompute()
+build_hose_fitting(fit_yz)
+place_hose_fitting(fit_yz, slot=0)
+doc.recompute()
+
+fit_xz = doc.addObject("PartDesign::Body", "hoseFittingXZ")
+fit_xz.Label = "штуцер 2"
+doc.recompute()
+build_hose_fitting(fit_xz)
+place_hose_fitting(fit_xz, slot=1)
 doc.recompute()
 
 def circle_union_area(n, radius, pitch):
@@ -722,19 +1040,25 @@ print(
     expected,
 )
 print(
-    "waterCover",
-    cover.getStatusString(),
+    "hoseFittingYZ",
+    fit_yz.getStatusString(),
     "vol",
-    None if cover.Shape.isNull() else cover.Shape.Volume,
+    None if fit_yz.Shape.isNull() else fit_yz.Shape.Volume,
+)
+print(
+    "hoseFittingXZ",
+    fit_xz.getStatusString(),
+    "vol",
+    None if fit_xz.Shape.isNull() else fit_xz.Shape.Volume,
 )
 
 # App-level visibility: each Body in Tip mode shows its final solid.
 # Other features stay hidden — Part Design allows only one visible shape
 # in a Body, so extra visibilities fight and everything can end up off.
-BODY_NAMES = ("drillTemplate", "waterCover")
+BODY_NAMES = ("drillTemplate", "waterCover", "hoseFittingYZ", "hoseFittingXZ")
 for obj in doc.Objects:
     obj.Visibility = False
-for part in (drill, cover):
+for part in (drill, cover, fit_yz, fit_xz):
     part.Visibility = True
     part.Tip.Visibility = False
     try:
@@ -795,14 +1119,25 @@ for obj in doc.Objects:
 hx = float(params.Width) + 4.0 * float(params.MountWidth)
 hy = float(params.Height) + 4.0 * float(params.MountWidth)
 gap = float(params.Margin)
-cam_x = (hx + gap) / 2.0
-cam_h = max(2.0 * hx + gap, hy) * 1.2
+fit_right = (
+    hx
+    + gap
+    + float(params.Width) / 2.0
+    + 4.0 * float(params.MountWidth)
+    + gap
+    + 40.0
+    + float(params.FittingHex)
+)
+cam_x = fit_right / 2.0
+cam_h = max(fit_right, hy) * 1.2
 
 _gui = f"""<?xml version="1.0" encoding="utf-8"?>
 <Document SchemaVersion="1" HasExpansion="1">
-    <Expand count="2">
+    <Expand count="4">
         <Expand name="drillTemplate" count="0"></Expand>
         <Expand name="waterCover" count="0"></Expand>
+        <Expand name="hoseFittingYZ" count="0"></Expand>
+        <Expand name="hoseFittingXZ" count="0"></Expand>
     </Expand>
     <ViewProviderData Count="{len(vp_blocks)}">
 {chr(10).join(vp_blocks)}
@@ -812,7 +1147,7 @@ _gui = f"""<?xml version="1.0" encoding="utf-8"?>
 """
 
 doc.saveAs(OUT)
-print("Saved", OUT, "tips", drill.Tip.Name, cover.Tip.Name)
+print("Saved", OUT, "tips", drill.Tip.Name, cover.Tip.Name, fit_yz.Tip.Name, fit_xz.Tip.Name)
 App.closeDocument(doc.Name)
 _tmp = OUT + ".tmp"
 with zipfile.ZipFile(OUT, "r") as zin, zipfile.ZipFile(_tmp, "w") as zout:
