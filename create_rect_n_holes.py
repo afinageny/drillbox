@@ -9,6 +9,9 @@
 # and walls of height WallHeight along the inner window, with a top
 # frame of width FrameWidth whose outer contour matches the walls.
 # Two G 1/2 (BSPP) wall holes sit in opposite +X and -Y walls, offset toward far corners.
+# Inner faces of the +X and -Y walls slope toward the holes (DrainSlope)
+# from the wall-contact face up through the frame. Inner wall/window
+# corners stay sharp so the two drain planes meet in the corner.
 # Two hoseFitting bodies (G 1/2, barb 19/22 mm) stand beside the cover, thread down.
 # Parameters live on the Params VarSet. Change them, then recompute.
 
@@ -480,9 +483,6 @@ def add_frame_window(body, prefix):
     body.Tip = win
     doc.recompute()
     print(prefix + "Window", win.getStatusString())
-    fillet = add_geom_fillet(
-        body, prefix + "FilletWindow", win, "Params.Fillet", "window"
-    )
     return add_cover_walls(body, prefix)
 
 
@@ -517,10 +517,6 @@ def add_cover_walls(body, prefix):
     body.Tip = cut
     doc.recompute()
     print(prefix + "WallWindow", cut.getStatusString())
-
-    fillet_in = add_geom_fillet(
-        body, prefix + "FilletWallInner", cut, "Params.Fillet", "wall_inner"
-    )
     return add_cover_frame(body, prefix)
 
 
@@ -643,6 +639,150 @@ def add_cover_wall_holes(body, prefix):
         body.Tip = hole
         doc.recompute()
         print(name, hole.getStatusString(), "dia", float(hole.Diameter))
+    last.Refine = True
+    body.Tip = last
+    doc.recompute()
+    return add_drain_ramps(body, prefix)
+
+
+def add_tri_ramp(body, name, p0, p1, p2, p0x_expr, p0y_expr, base_expr, rise_expr, z_expr, length_expr, base_horizontal):
+    """Right-triangle pad: p0-p1 along the wall, p0-p2 is the rise into the cavity."""
+    sk = body.newObject("Sketcher::SketchObject", name + "Sketch")
+    sk.AttachmentSupport = [(body.Origin.OriginFeatures[3], "")]
+    sk.MapMode = "FlatFace"
+    sk.setExpression("AttachmentOffset.Base.z", z_expr)
+    doc.recompute()
+    sk.addGeometry(Part.LineSegment(App.Vector(p0[0], p0[1], 0), App.Vector(p1[0], p1[1], 0)))
+    sk.addGeometry(Part.LineSegment(App.Vector(p1[0], p1[1], 0), App.Vector(p2[0], p2[1], 0)))
+    sk.addGeometry(Part.LineSegment(App.Vector(p2[0], p2[1], 0), App.Vector(p0[0], p0[1], 0)))
+    sk.addConstraint(
+        [
+            Sketcher.Constraint("Coincident", 0, 2, 1, 1),
+            Sketcher.Constraint("Coincident", 1, 2, 2, 1),
+            Sketcher.Constraint("Coincident", 2, 2, 0, 1),
+            Sketcher.Constraint("Horizontal" if base_horizontal else "Vertical", 0),
+            Sketcher.Constraint("Vertical" if base_horizontal else "Horizontal", 2),
+        ]
+    )
+    c_x = sk.addConstraint(Sketcher.Constraint("DistanceX", 0, 1, p0[0]))
+    c_y = sk.addConstraint(Sketcher.Constraint("DistanceY", 0, 1, p0[1]))
+    c_b = sk.addConstraint(Sketcher.Constraint("Distance", 0, abs(p1[0] - p0[0]) + abs(p1[1] - p0[1])))
+    c_r = sk.addConstraint(Sketcher.Constraint("Distance", 2, abs(p2[0] - p0[0]) + abs(p2[1] - p0[1])))
+    sk.renameConstraint(c_x, "PosX")
+    sk.renameConstraint(c_y, "PosY")
+    sk.renameConstraint(c_b, "Base")
+    sk.renameConstraint(c_r, "Rise")
+    sk.setExpression("Constraints.PosX", p0x_expr)
+    sk.setExpression("Constraints.PosY", p0y_expr)
+    sk.setExpression("Constraints.Base", base_expr)
+    sk.setExpression("Constraints.Rise", rise_expr)
+    doc.recompute()
+    print(name + "Sketch", sk.FullyConstrained, sk.getStatusString())
+    pad = body.newObject("PartDesign::Pad", name)
+    pad.Profile = sk
+    pad.setExpression("Length", length_expr)
+    body.Tip = pad
+    doc.recompute()
+    print(name, pad.getStatusString())
+    return pad
+
+
+def add_drain_ramps(body, prefix):
+    """Slight inner slope on the +X and -Y walls, lowest at each drain hole."""
+    wlen = (
+        float(params.Width) / 2.0
+        - float(params.EdgeFillet)
+        + (params.Count - 1) * float(params.Offset) / 2.0
+        + float(params.Diameter) / 2.0
+        + float(params.Rim)
+        - 2.0 * float(params.EarMark)
+    )
+    wwid = (
+        float(params.Height) / 2.0
+        - float(params.EdgeFillet)
+        + float(params.Diameter) / 2.0
+        + float(params.Rim)
+        - 2.0 * float(params.EarMark)
+    )
+    slope = float(params.DrainSlope)
+    rh = float(params.WallHoleDiameter) / 2.0
+    hx = -float(params.Width) / 4.0
+    hy = float(params.Height) / 4.0
+    x_l = -wlen / 2.0
+    x_r = wlen / 2.0
+    y_b = -wwid / 2.0
+    y_t = wwid / 2.0
+    y_in = -wwid / 2.0
+    x_in = wlen / 2.0
+    z0 = "0 mm"
+    h_wall = "Params.Thickness / 2 + Params.WallHeight + Params.WallThickness"
+    rise = "Params.DrainSlope"
+    gap = "Params.WallHoleDiameter / 2"
+    x_left = "-(" + WINDOW_LEN + ") / 2"
+    x_right = "(" + WINDOW_LEN + ") / 2"
+    y_bot = "-(" + WINDOW_WID + ") / 2"
+    y_top = "(" + WINDOW_WID + ") / 2"
+    y_inner = "-(" + WINDOW_WID + ") / 2"
+    x_inner = "(" + WINDOW_LEN + ") / 2"
+    # Stop at the hole rim so the pads do not close the openings.
+    # -Y wall: ramps along X toward the hole, rise +Y into the cavity.
+    add_tri_ramp(
+        body,
+        prefix + "DrainXZLeft",
+        (x_l, y_in),
+        (hx - rh, y_in),
+        (x_l, y_in + slope),
+        x_left,
+        y_inner,
+        "(" + WINDOW_LEN + ") / 2 - Params.Width / 4 - " + gap,
+        rise,
+        z0,
+        h_wall,
+        True,
+    )
+    add_tri_ramp(
+        body,
+        prefix + "DrainXZRight",
+        (x_r, y_in),
+        (hx + rh, y_in),
+        (x_r, y_in + slope),
+        x_right,
+        y_inner,
+        "(" + WINDOW_LEN + ") / 2 + Params.Width / 4 - " + gap,
+        rise,
+        z0,
+        h_wall,
+        True,
+    )
+    # +X wall: ramps along Y toward the hole, rise -X into the cavity.
+    add_tri_ramp(
+        body,
+        prefix + "DrainYZBot",
+        (x_in, y_b),
+        (x_in, hy - rh),
+        (x_in - slope, y_b),
+        x_inner,
+        y_bot,
+        "(" + WINDOW_WID + ") / 2 + Params.Height / 4 - " + gap,
+        rise,
+        z0,
+        h_wall,
+        False,
+    )
+    last = add_tri_ramp(
+        body,
+        prefix + "DrainYZTop",
+        (x_in, y_t),
+        (x_in, hy + rh),
+        (x_in - slope, y_t),
+        x_inner,
+        y_top,
+        "(" + WINDOW_WID + ") / 2 - Params.Height / 4 - " + gap,
+        rise,
+        z0,
+        h_wall,
+        False,
+    )
     last.Refine = True
     body.Tip = last
     doc.recompute()
@@ -908,6 +1048,13 @@ params.addProperty(
     "Толщина стенок waterCover",
 )
 params.WallThickness = "3 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "DrainSlope",
+    "Cover",
+    "Высота внутреннего уклона стенок к отверстиям слива",
+)
+params.DrainSlope = "10 mm"
 params.addProperty(
     "App::PropertyLength",
     "FrameWidth",
