@@ -6,3 +6,9 @@ __pycache__/
 
 # Separate local tool, not part of this CAD project
 ozon-monitor/
+
+# OpenSCAD playground
+openscad/web/node_modules/
+openscad/web/dist/
+openscad/web/public/wasm/
+openscad/web/public/openscad-wasm.zip

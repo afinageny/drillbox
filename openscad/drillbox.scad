@@ -6,30 +6,44 @@ part = "assembly"; // [assembly, drillTemplate, waterCover, hoseFitting, drainPl
 show_threads = true;
 
 /* [Holes] */
-hole_count = 2;
-hole_diameter = 78;
-rim = 10;
-hole_offset = 71;
+// Количество отверстий
+hole_count = 2; // [1:8]
+// Диаметр, мм
+hole_diameter = 78; // [20:0.5:150]
+// Поле вокруг отверстия, мм
+rim = 10; // [2:40]
+// Шаг между центрами, мм
+hole_offset = 71; // [20:0.5:200]
 
 /* [Plate] */
-margin = 20;
-thickness = 10;
-corner_fillet = 6;
-edge_fillet = 2;
-corner_inset = 10;
-corner_hole_d = 5;
+// Отступ до края пластины, мм
+margin = 20; // [5:80]
+// Толщина пластины, мм
+thickness = 10; // [4:30]
+// Скругление углов пластины, мм
+corner_fillet = 6; // [0:20]
+// Скругление верхнего ребра, мм
+edge_fillet = 2; // [0:8]
+// Отступ крепежа от края, мм
+corner_inset = 10; // [4:40]
+// Диаметр крепежного отверстия, мм
+corner_hole_d = 5; // [2:0.5:12]
 
 /* [Cover] */
-wall_height = 50;
-wall_thickness = 3;
-thread_boss_length = 12;
-lid_hole_oversize = 10;
-fitting_barb_22 = 22;
-fitting_barb_19 = 19;
-fitting_bore = 12;
-fitting_hex = 27;
+// Высота стенок, мм
+wall_height = 50; // [10:120]
+// Толщина стенок, мм
+wall_thickness = 3; // [1:0.5:10]
+// Длина резьбы G 1/2, мм
+thread_boss_length = 12; // [6:30]
+// На сколько отверстия в крышке больше Diameter, мм
+lid_hole_oversize = 10; // [0:40]
+fitting_barb_22 = 22; // [10:40]
+fitting_barb_19 = 19; // [10:40]
+fitting_bore = 12; // [4:20]
+fitting_hex = 27; // [12:40]
 
-// ISO 228 G 1/2
+/* [Hidden] */
 G12_PITCH = 1.814;
 G12_MAJOR = 20.955;
 G12_MINOR = 18.631;
