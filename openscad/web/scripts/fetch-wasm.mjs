@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { createWriteStream } from "node:fs";
-import { mkdir, readdir, copyFile, stat } from "node:fs/promises";
+import { createWriteStream, openSync, readSync, closeSync } from "node:fs";
+import { mkdir, readdir, copyFile, stat, unlink } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import path from "node:path";
@@ -41,6 +41,34 @@ if ((await exists(path.join(dest, "openscad.js"))) && (await exists(path.join(de
   process.exit(0);
 }
 
+function isZip(file) {
+  const fd = openSync(file, "r");
+  const buf = Buffer.alloc(4);
+  readSync(fd, buf, 0, 4, 0);
+  closeSync(fd);
+  return buf[0] === 0x50 && buf[1] === 0x4b;
+}
+
+function unpackZip(file, outDir) {
+  const cmds =
+    process.platform === "win32"
+      ? [["tar", ["-xf", file, "-C", outDir]]]
+      : [
+          ["unzip", ["-oq", file, "-d", outDir]],
+          ["python3", ["-m", "zipfile", "-e", file, outDir]],
+        ];
+  let lastErr;
+  for (const [bin, args] of cmds) {
+    try {
+      execFileSync(bin, args, { stdio: "inherit" });
+      return;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error("No zip unpacker found");
+}
+
 await mkdir(dest, { recursive: true });
 console.log("Downloading OpenSCAD WASM…");
 const res = await fetch(URL);
@@ -48,9 +76,13 @@ if (!res.ok || !res.body) {
   throw new Error(`Download failed: ${res.status} ${res.statusText}`);
 }
 await pipeline(Readable.fromWeb(res.body), createWriteStream(zipPath));
-
-console.log("Unpacking…");
-execFileSync("tar", ["-xf", zipPath, "-C", dest], { stdio: "inherit" });
+const zipStat = await stat(zipPath);
+if (!isZip(zipPath)) {
+  await unlink(zipPath);
+  throw new Error(`Downloaded file is not a zip (${zipStat.size} bytes)`);
+}
+console.log(`Unpacking ${zipStat.size} bytes…`);
+unpackZip(zipPath, dest);
 
 const js = await findFile(dest, "openscad.js");
 const wasm = await findFile(dest, "openscad.wasm");
