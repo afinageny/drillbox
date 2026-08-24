@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 *.FCBak
+*.3mf
+
+# Separate local tool, not part of this CAD project
+ozon-monitor/

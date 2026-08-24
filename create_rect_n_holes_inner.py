@@ -9,8 +9,11 @@
 # the walls wrap around the screw holes at CornerInset (same offset as to the
 # plate edge), so there is room to fasten the cover. Screws stay outside the box.
 # The bottom plate is cut through along the inner perimeter of the walls.
-# Two G 1/2 (BSPP) drain holes sit at mid-length and mid-height of the +X and -Y walls.
-# Two G 1/2 (BSPP) drain holes sit in the middle of the +X and -Y walls.
+# Two G 1/2 male nipples stick out of the +X and -Y walls; a hose fitting and
+# a cap with female G 1/2 stand beside the cover.
+# A lid on top of the walls follows the outer wall outline so it covers the
+# walls and does not overhang them. Round holes in the lid sit above the
+# template holes; their diameter is Diameter plus LidHoleOversize.
 # Parameters live on the Params VarSet. Change them, then recompute.
 
 import math
@@ -29,6 +32,13 @@ import Sketcher
 import geom_fillet
 
 OUT = r"C:\Users\vofka\dev\freecad\drillbox\rect-n-holes-inner.FCStd"
+
+# ISO 228 G 1/2 (BSPP). Pitch 14 TPI.
+G12_PITCH = 1.814
+G12_MAJOR = 20.955
+G12_MINOR = 18.631
+FITTING_HEX_H = 7.0
+FITTING_TOOTH = 4.5
 
 
 def _install_geom_fillet():
@@ -281,13 +291,15 @@ def _wall_outline_segments(hw, hh, hx, hy, inset, wrap):
     )
 
 
-def add_notched_wall_sketch(body, name, inset, wrap, inset_expr, wrap_expr):
+def add_notched_wall_sketch(
+    body, name, inset, wrap, inset_expr, wrap_expr, z_expr="Params.Thickness / 2"
+):
     """Closed inset rectangle with quarter-circle wraps around the four screw holes."""
     sk = body.newObject("Sketcher::SketchObject", name)
     sk.AttachmentSupport = [(body.Origin.OriginFeatures[3], "")]
     sk.MapMode = "FlatFace"
     doc.recompute()
-    sk.setExpression("AttachmentOffset.Base.z", "Params.Thickness / 2")
+    sk.setExpression("AttachmentOffset.Base.z", z_expr)
     doc.recompute()
 
     C = float(params.CornerInset)
@@ -453,92 +465,357 @@ def add_cover_walls(body, prefix):
         floor.Reversed = True
         doc.recompute()
         print(prefix + "FloorWindow", floor.getStatusString(), "rev", floor.Reversed)
+    return add_cover_lid(body, prefix)
+
+
+def add_cover_lid(body, prefix):
+    """Solid lid on top of the walls; outer contour matches the wall outer outline."""
+    I = float(params.WallInset)
+    wr = float(params.CornerInset)
+    z_expr = "Params.Thickness / 2 + Params.WallHeight"
+    sk = add_notched_wall_sketch(
+        body,
+        prefix + "SketchLid",
+        I,
+        wr,
+        "Params.WallInset",
+        "Params.CornerInset",
+        z_expr,
+    )
+    pad = body.newObject("PartDesign::Pad", prefix + "Lid")
+    pad.Profile = sk
+    pad.setExpression("Length", "Params.WallThickness")
+    pad.Refine = True
+    body.Tip = pad
+    doc.recompute()
+    print(prefix + "Lid", pad.getStatusString(), "rev", pad.Reversed)
+    if pad.getStatusString() != "Valid":
+        pad.Reversed = True
+        doc.recompute()
+        print(prefix + "Lid", pad.getStatusString(), "rev", pad.Reversed)
+    return add_lid_holes(body, prefix)
+
+
+def add_lid_holes(body, prefix):
+    """Holes in the lid above the template holes, Diameter + LidHoleOversize."""
+    z_expr = "Params.Thickness / 2 + Params.WallHeight"
+    r = (float(params.Diameter) + float(params.LidHoleOversize)) / 2.0
+    cx = -((params.Count - 1) * float(params.Offset)) / 2.0
+    holes = body.newObject("Sketcher::SketchObject", prefix + "SketchLidHole")
+    holes.AttachmentSupport = [(body.Origin.OriginFeatures[3], "")]
+    holes.MapMode = "FlatFace"
+    doc.recompute()
+    holes.setExpression("AttachmentOffset.Base.z", z_expr)
+    doc.recompute()
+    holes.addGeometry(Part.Circle(App.Vector(cx, 0, 0), App.Vector(0, 0, 1), r), False)
+    c_r = holes.addConstraint(Sketcher.Constraint("Radius", 0, r))
+    c_x = holes.addConstraint(Sketcher.Constraint("DistanceX", 0, 3, cx))
+    holes.addConstraint(Sketcher.Constraint("PointOnObject", 0, 3, -1))
+    holes.renameConstraint(c_r, "Radius")
+    holes.renameConstraint(c_x, "CenterX")
+    holes.setExpression(
+        "Constraints.Radius", "(Params.Diameter + Params.LidHoleOversize) / 2"
+    )
+    holes.setExpression("Constraints.CenterX", "-(Params.Count - 1) * Params.Offset / 2")
+    doc.recompute()
+    print(prefix + "SketchLidHole", "constrained", holes.FullyConstrained, holes.getStatusString())
+
+    pocket = body.newObject("PartDesign::Pocket", prefix + "LidHole")
+    pocket.Profile = holes
+    pocket.Type = "Length"
+    pocket.setExpression("Length", "Params.WallThickness")
+    pocket.Reversed = True
+    pocket.Refine = True
+    body.Tip = pocket
+    doc.recompute()
+    print(prefix + "LidHole", pocket.getStatusString(), "rev", pocket.Reversed)
+    if pocket.getStatusString() != "Valid":
+        pocket.Reversed = False
+        doc.recompute()
+        print(prefix + "LidHole", pocket.getStatusString(), "rev", pocket.Reversed)
+
+    pattern = body.newObject("PartDesign::LinearPattern", prefix + "LidHolePattern")
+    pattern.Originals = [pocket]
+    pattern.Direction = (holes, ["H_Axis"])
+    pattern.Mode = "Spacing"
+    pattern.setExpression("Offset", "Params.Offset")
+    pattern.setExpression("Occurrences", "Params.Count")
+    pattern.Refine = True
+    body.Tip = pattern
+    doc.recompute()
+    print(prefix + "LidHolePattern", pattern.getStatusString())
     return add_cover_wall_holes(body, prefix)
 
 
 def add_cover_wall_holes(body, prefix):
-    """G 1/2 BSPP holes with outer bosses, mid-height and mid-length of +X and -Y walls."""
+    """Male G 1/2 nipples on +X and -Y walls, through-bore for water."""
     z_expr = "Params.Thickness / 2 + Params.WallHeight / 2"
     outer_x = "Params.Width / 2 - Params.WallInset"
     outer_y = "Params.Height / 2 - Params.WallInset"
-    last = None
-    specs = (
-        (
-            prefix + "HoleYZ",
-            True,
-            body.Origin.OriginFeatures[5],
-            "(" + outer_x + ") + Params.ThreadBossLength",
-            "0 mm",
-            outer_x,
-            "0 mm",
-        ),
-        (
-            prefix + "HoleXZ",
-            False,
-            body.Origin.OriginFeatures[4],
-            "(" + outer_y + ") + Params.ThreadBossLength",
-            "0 mm",
-            "-(" + outer_y + ")",
-            "0 mm",
-        ),
-    )
-    cz = float(params.Thickness) / 2.0 + float(params.WallHeight) / 2.0
-    for name, along_x, plane, sketch_z, sketch_x, boss_along, boss_cross in specs:
-        boss = body.newObject("PartDesign::AdditiveCylinder", name + "Boss")
-        boss.setExpression("Radius", "Params.ThreadBossDiameter / 2")
-        boss.setExpression("Height", "Params.ThreadBossLength")
-        boss.setExpression("Placement.Base.z", z_expr)
-        if along_x:
-            boss.Placement.Rotation = App.Rotation(App.Vector(0, 1, 0), 90)
-            boss.setExpression("Placement.Base.x", boss_along)
-            boss.setExpression("Placement.Base.y", boss_cross)
-        else:
-            boss.Placement.Rotation = App.Rotation(App.Vector(1, 0, 0), 90)
-            boss.setExpression("Placement.Base.x", boss_cross)
-            boss.setExpression("Placement.Base.y", boss_along)
-        body.Tip = boss
-        doc.recompute()
-        print(name + "Boss", boss.getStatusString())
-
-        sk = body.newObject("Sketcher::SketchObject", name + "Sketch")
-        sk.AttachmentSupport = [(plane, "")]
-        sk.MapMode = "FlatFace"
-        sk.setExpression("AttachmentOffset.Base.z", sketch_z)
-        doc.recompute()
-        g = sk.addGeometry(
-            Part.Circle(App.Vector(0, cz, 0), App.Vector(0, 0, 1), 5), False
-        )
-        c_x = sk.addConstraint(Sketcher.Constraint("DistanceX", g, 3, 0))
-        c_y = sk.addConstraint(Sketcher.Constraint("DistanceY", g, 3, cz))
-        sk.renameConstraint(c_x, "CenterX")
-        sk.renameConstraint(c_y, "CenterY")
-        sk.setExpression("Constraints.CenterX", sketch_x)
-        sk.setExpression("Constraints.CenterY", z_expr)
-        doc.recompute()
-        print(name + "Sketch", sk.FullyConstrained, sk.getStatusString())
-
-        hole = body.newObject("PartDesign::Hole", name)
-        hole.Profile = sk
-        hole.Threaded = True
-        hole.ThreadType = "BSP"
-        hole.ThreadSize = "1/2"
-        hole.ModelThread = True
-        hole.Tapered = False
-        hole.DepthType = "Dimension"
-        hole.DrillPoint = "Flat"
-        hole.setExpression("Depth", "Params.WallThickness + Params.ThreadBossLength")
-        last = hole
-        body.Tip = hole
-        doc.recompute()
-        print(name, hole.getStatusString(), "dia", float(hole.Diameter))
-        if hole.getStatusString() != "Valid":
-            hole.Reversed = True
-            doc.recompute()
-            print(name, hole.getStatusString(), "rev", hole.Reversed)
+    add_male_nipple(body, prefix + "NippleYZ", True, z_expr, outer_x)
+    last = add_male_nipple(body, prefix + "NippleXZ", False, z_expr, outer_y)
     last.Refine = True
     body.Tip = last
     doc.recompute()
     return last
+
+
+def _add_closed_polyline(sk, pts):
+    geos = []
+    n = len(pts)
+    for i in range(n):
+        a = pts[i]
+        b = pts[(i + 1) % n]
+        geos.append(
+            sk.addGeometry(
+                Part.LineSegment(App.Vector(a[0], a[1], 0), App.Vector(b[0], b[1], 0)),
+                False,
+            )
+        )
+    sk.addConstraint(
+        [Sketcher.Constraint("Coincident", geos[i], 2, geos[(i + 1) % n], 1) for i in range(n)]
+    )
+    return geos
+
+
+def _g12_thread_profile_along_x(rin, rout, hb):
+    """Thread triangle: sketch X along axis, sketch Y radius."""
+    return ((hb, rin), (0.0, rout), (-hb, rin))
+
+
+def add_male_nipple(body, name, along_x, z_expr, outer_expr):
+    """G 1/2 male stub sticking out of the wall, plus a through bore."""
+    rin = G12_MINOR / 2.0
+    rout = G12_MAJOR / 2.0
+    hb = 0.38 * G12_PITCH
+
+    core = body.newObject("PartDesign::AdditiveCylinder", name + "Core")
+    core.Radius = rin
+    core.setExpression("Height", "Params.ThreadBossLength")
+    core.setExpression("Placement.Base.z", z_expr)
+    if along_x:
+        core.Placement.Rotation = App.Rotation(App.Vector(0, 1, 0), 90)
+        core.setExpression("Placement.Base.x", outer_expr)
+        core.setExpression("Placement.Base.y", "0 mm")
+    else:
+        core.Placement.Rotation = App.Rotation(App.Vector(1, 0, 0), 90)
+        core.setExpression("Placement.Base.x", "0 mm")
+        core.setExpression("Placement.Base.y", "-(" + outer_expr + ")")
+    body.Tip = core
+    doc.recompute()
+    print(name + "Core", core.getStatusString())
+
+    skt = body.newObject("Sketcher::SketchObject", name + "ThreadSketch")
+    if along_x:
+        skt.AttachmentSupport = [(body.Origin.OriginFeatures[4], "")]
+        skt.setExpression("AttachmentOffset.Base.x", outer_expr)
+        skt.setExpression("AttachmentOffset.Base.y", z_expr)
+    else:
+        skt.AttachmentSupport = [(body.Origin.OriginFeatures[5], "")]
+        skt.setExpression("AttachmentOffset.Base.x", "-(" + outer_expr + ")")
+        skt.setExpression("AttachmentOffset.Base.y", z_expr)
+    skt.MapMode = "FlatFace"
+    doc.recompute()
+    _add_closed_polyline(skt, _g12_thread_profile_along_x(rin, rout, hb))
+    doc.recompute()
+
+    helix = body.newObject("PartDesign::AdditiveHelix", name + "Thread")
+    helix.Profile = skt
+    helix.ReferenceAxis = (skt, ["H_Axis"])
+    helix.Mode = "pitch-height-angle"
+    helix.Pitch = G12_PITCH
+    helix.Angle = 0
+    helix.setExpression("Height", "Params.ThreadBossLength")
+    if not along_x:
+        helix.Reversed = True
+    body.Tip = helix
+    doc.recompute()
+    print(name + "Thread", helix.getStatusString())
+    if helix.getStatusString() != "Valid":
+        helix.Reversed = not helix.Reversed
+        doc.recompute()
+        print(name + "Thread", helix.getStatusString(), "rev", helix.Reversed)
+
+    bore = body.newObject("PartDesign::SubtractiveCylinder", name + "Bore")
+    bore.setExpression("Radius", "Params.FittingBore / 2")
+    bore.setExpression("Height", "Params.WallThickness + Params.ThreadBossLength + 2 mm")
+    bore.setExpression("Placement.Base.z", z_expr)
+    if along_x:
+        bore.Placement.Rotation = App.Rotation(App.Vector(0, 1, 0), 90)
+        bore.setExpression(
+            "Placement.Base.x",
+            "(" + outer_expr + ") - Params.WallThickness - 1 mm",
+        )
+        bore.setExpression("Placement.Base.y", "0 mm")
+    else:
+        bore.Placement.Rotation = App.Rotation(App.Vector(1, 0, 0), 90)
+        bore.setExpression("Placement.Base.x", "0 mm")
+        bore.setExpression(
+            "Placement.Base.y",
+            "-(" + outer_expr + ") + Params.WallThickness + 1 mm",
+        )
+    body.Tip = bore
+    doc.recompute()
+    print(name + "Bore", bore.getStatusString())
+    return bore
+
+
+def _hex_points(af):
+    rv = af / math.sqrt(3.0)
+    pts = []
+    for i in range(6):
+        ang = math.radians(30.0 + i * 60.0)
+        pts.append((rv * math.cos(ang), rv * math.sin(ang)))
+    return pts
+
+
+def _barb_teeth(diameter, z0, n=3, step=FITTING_TOOTH):
+    ridge = diameter / 2.0 + 0.7
+    root = diameter / 2.0 - 0.9
+    pts = [(root, z0)]
+    z = z0
+    for _ in range(n):
+        pts.append((ridge, z + 1.1))
+        z += step
+        pts.append((root, z))
+    return pts, z
+
+
+def _add_hex_pad(body, af, height):
+    hex_sk = body.newObject("Sketcher::SketchObject", "SketchHex")
+    hex_sk.AttachmentSupport = [(body.Origin.OriginFeatures[3], "")]
+    hex_sk.MapMode = "FlatFace"
+    doc.recompute()
+    _add_closed_polyline(hex_sk, _hex_points(af))
+    doc.recompute()
+    hex_pad = body.newObject("PartDesign::Pad", "Hex")
+    hex_pad.Profile = hex_sk
+    hex_pad.Length = height
+    body.Tip = hex_pad
+    doc.recompute()
+    print(body.Name, "Hex", hex_pad.getStatusString())
+    return hex_pad
+
+
+def _add_female_g12_socket(body, depth_expr):
+    """Internal G 1/2 from z=0 downward, depth_expr long."""
+    cup = body.newObject("PartDesign::AdditiveCylinder", "Socket")
+    cup.Radius = G12_MAJOR / 2.0 + 3.5
+    cup.setExpression("Height", depth_expr)
+    cup.setExpression("Placement.Base.z", "-(" + depth_expr + ")")
+    body.Tip = cup
+    doc.recompute()
+    print(body.Name, "Socket", cup.getStatusString())
+
+    sk = body.newObject("Sketcher::SketchObject", "SketchSocket")
+    sk.AttachmentSupport = [(body.Origin.OriginFeatures[3], "")]
+    sk.MapMode = "FlatFace"
+    sk.setExpression("AttachmentOffset.Base.z", "-(" + depth_expr + ")")
+    doc.recompute()
+    g = sk.addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 0, 1), 5), False)
+    sk.addConstraint(Sketcher.Constraint("PointOnObject", g, 3, -1))
+    sk.addConstraint(Sketcher.Constraint("PointOnObject", g, 3, -2))
+    doc.recompute()
+    hole = body.newObject("PartDesign::Hole", "SocketThread")
+    hole.Profile = sk
+    hole.Threaded = True
+    hole.ThreadType = "BSP"
+    hole.ThreadSize = "1/2"
+    hole.ModelThread = True
+    hole.Tapered = False
+    hole.DepthType = "Dimension"
+    hole.DrillPoint = "Flat"
+    hole.setExpression("Depth", depth_expr)
+    hole.Reversed = True
+    body.Tip = hole
+    doc.recompute()
+    print(body.Name, "SocketThread", hole.getStatusString())
+    if hole.getStatusString() != "Valid":
+        hole.Reversed = False
+        doc.recompute()
+        print(body.Name, "SocketThread", hole.getStatusString(), "rev", hole.Reversed)
+    return hole
+
+
+def build_hose_fitting(body):
+    """Female G 1/2 to 19/22 mm hose barb. Thread -Z, barb +Z."""
+    d22 = float(params.FittingBarb22)
+    d19 = float(params.FittingBarb19)
+    bore = float(params.FittingBore)
+    af = float(params.FittingHex)
+    depth_expr = "Params.ThreadBossLength"
+    thread_len = float(params.ThreadBossLength)
+
+    _add_hex_pad(body, af, FITTING_HEX_H)
+    _add_female_g12_socket(body, depth_expr)
+
+    z0 = FITTING_HEX_H + 1.5
+    barb_pts = [(0.0, FITTING_HEX_H), (d22 / 2.0 - 0.4, FITTING_HEX_H)]
+    t22, z = _barb_teeth(d22, z0)
+    barb_pts.extend(t22)
+    t19, z = _barb_teeth(d19, z + 0.6)
+    barb_pts.extend(t19)
+    barb_pts.append((bore / 2.0 + 0.6, z + 3.0))
+    barb_pts.append((0.0, z + 3.0))
+    skb = body.newObject("Sketcher::SketchObject", "SketchBarb")
+    skb.AttachmentSupport = [(body.Origin.OriginFeatures[4], "")]
+    skb.MapMode = "FlatFace"
+    doc.recompute()
+    _add_closed_polyline(skb, barb_pts)
+    doc.recompute()
+    barb = body.newObject("PartDesign::Revolution", "Barb")
+    barb.Profile = skb
+    barb.ReferenceAxis = (body.Origin.OriginFeatures[2], "")
+    barb.Angle = 360
+    body.Tip = barb
+    doc.recompute()
+    print(body.Name, "Barb", barb.getStatusString())
+
+    hole = body.newObject("PartDesign::SubtractiveCylinder", "Bore")
+    hole.setExpression("Radius", "Params.FittingBore / 2")
+    hole.Height = thread_len + FITTING_HEX_H + 40.0
+    hole.setExpression("Placement.Base.z", "-(" + depth_expr + ") - 1 mm")
+    hole.Refine = True
+    body.Tip = hole
+    doc.recompute()
+    print(body.Name, "Bore", hole.getStatusString())
+    return hole
+
+
+def build_drain_plug(body):
+    """Blind female G 1/2 cap."""
+    af = float(params.FittingHex)
+    depth_expr = "Params.ThreadBossLength"
+    _add_hex_pad(body, af, FITTING_HEX_H)
+    last = _add_female_g12_socket(body, depth_expr)
+    last.Refine = True
+    body.Tip = last
+    doc.recompute()
+    return last
+
+
+def place_hose_fitting(body):
+    """On the print bed, opposite the +X drain, a few cm away."""
+    body.Placement.Rotation = App.Rotation()
+    body.setExpression("Placement.Base.z", "Params.ThreadBossLength")
+    body.setExpression("Placement.Base.y", "0 mm")
+    body.setExpression(
+        "Placement.Base.x",
+        "Params.Width + Params.Margin + Params.Width / 2 - Params.WallInset"
+        " + Params.ThreadBossLength + 3 cm",
+    )
+
+
+def place_drain_plug(body):
+    """On the print bed, opposite the -Y drain, a few cm away."""
+    body.Placement.Rotation = App.Rotation()
+    body.setExpression("Placement.Base.z", "Params.ThreadBossLength")
+    body.setExpression("Placement.Base.x", "Params.Width + Params.Margin")
+    body.setExpression(
+        "Placement.Base.y",
+        "-(Params.Height / 2 - Params.WallInset)"
+        " - Params.ThreadBossLength - 3 cm",
+    )
 
 
 def build_plate(body, prefix, with_holes):
@@ -602,7 +879,7 @@ params.Label = "Params"
 params.addProperty("App::PropertyInteger", "Count", "Holes", "Количество окружностей")
 params.Count = 2
 params.addProperty("App::PropertyLength", "Diameter", "Holes", "Диаметр окружности")
-params.Diameter = "76 mm"
+params.Diameter = "78 mm"
 params.addProperty(
     "App::PropertyLength",
     "Rim",
@@ -695,16 +972,51 @@ params.addProperty(
     "App::PropertyLength",
     "ThreadBossLength",
     "Cover",
-    "Длина бобышки под резьбу G 1/2 снаружи стенки",
+    "Длина наружной резьбы G 1/2 на сливных штуцерах крышки",
 )
-params.ThreadBossLength = "8 mm"
+params.ThreadBossLength = "12 mm"
 params.addProperty(
     "App::PropertyLength",
-    "ThreadBossDiameter",
-    "Cover",
-    "Диаметр бобышки под резьбу G 1/2",
+    "FittingBarb22",
+    "Fitting",
+    "Большая ступень ёлки штуцера (шланг 22 мм)",
 )
-params.ThreadBossDiameter = "32 mm"
+params.FittingBarb22 = "22 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FittingBarb19",
+    "Fitting",
+    "Малая ступень ёлки штуцера (шланг 19 мм)",
+)
+params.FittingBarb19 = "19 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FittingBore",
+    "Fitting",
+    "Внутренний канал слива и штуцера",
+)
+params.FittingBore = "12 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FittingHex",
+    "Fitting",
+    "Размер под ключ шестигранника штуцера и заглушки",
+)
+params.FittingHex = "27 mm"
+params.addProperty(
+    "App::PropertyLength",
+    "FrameWidth",
+    "Cover",
+    "Ширина верхней рамки над стенками waterCover",
+)
+params.FrameWidth = "1 cm"
+params.addProperty(
+    "App::PropertyLength",
+    "LidHoleOversize",
+    "Cover",
+    "На сколько отверстия в крышке больше Diameter",
+)
+params.LidHoleOversize = "1 cm"
 params.addProperty("App::PropertyLength", "Width", "Plate", "Ширина (считается)")
 params.addProperty("App::PropertyLength", "Height", "Plate", "Высота (считается)")
 params.setExpression("Width", "2 * Margin + Diameter + (Count - 1) * Offset")
@@ -722,6 +1034,20 @@ doc.recompute()
 build_plate(cover, "WC", with_holes=False)
 add_cover_walls(cover, "WC")
 cover.setExpression("Placement.Base.x", "Params.Width + Params.Margin")
+doc.recompute()
+
+fit = doc.addObject("PartDesign::Body", "hoseFitting")
+fit.Label = "штуцер 1/2"
+doc.recompute()
+build_hose_fitting(fit)
+place_hose_fitting(fit)
+doc.recompute()
+
+plug = doc.addObject("PartDesign::Body", "drainPlug")
+plug.Label = "заглушка 1/2"
+doc.recompute()
+build_drain_plug(plug)
+place_drain_plug(plug)
 doc.recompute()
 
 r = float(params.Diameter) / 2.0
@@ -750,9 +1076,22 @@ print(
     None if cover.Shape.isNull() else cover.Shape.Volume,
 )
 
+print(
+    "hoseFitting",
+    fit.getStatusString(),
+    "vol",
+    None if fit.Shape.isNull() else fit.Shape.Volume,
+)
+print(
+    "drainPlug",
+    plug.getStatusString(),
+    "vol",
+    None if plug.Shape.isNull() else plug.Shape.Volume,
+)
+
 for obj in doc.Objects:
     obj.Visibility = False
-for part in (drill, cover):
+for part in (drill, cover, fit, plug):
     part.Visibility = True
     part.Tip.Visibility = False
     try:
@@ -760,7 +1099,7 @@ for part in (drill, cover):
     except Exception:
         pass
 
-BODY_NAMES = ("drillTemplate", "waterCover")
+BODY_NAMES = ("drillTemplate", "waterCover", "hoseFitting", "drainPlug")
 
 
 def _vp(name, visible, expanded=False, extra="", with_extensions=False):
@@ -812,14 +1151,19 @@ for obj in doc.Objects:
     else:
         vp_blocks.append(_vp(obj.Name, False))
 
-cam_x = (float(params.Width) + float(params.Margin)) / 2.0
-cam_h = max(2.0 * float(params.Width) + float(params.Margin), float(params.Height)) * 1.2
+cam_x = float(params.Width) + float(params.Margin) + float(params.Width) / 4.0
+cam_h = max(
+    2.0 * float(params.Width) + 2.0 * float(params.Margin) + 80.0,
+    float(params.Height) + 80.0,
+) * 1.2
 
 _gui = f"""<?xml version="1.0" encoding="utf-8"?>
 <Document SchemaVersion="1" HasExpansion="1">
-    <Expand count="2">
+    <Expand count="4">
         <Expand name="drillTemplate" count="0"></Expand>
         <Expand name="waterCover" count="0"></Expand>
+        <Expand name="hoseFitting" count="0"></Expand>
+        <Expand name="drainPlug" count="0"></Expand>
     </Expand>
     <ViewProviderData Count="{len(vp_blocks)}">
 {chr(10).join(vp_blocks)}
@@ -829,7 +1173,7 @@ _gui = f"""<?xml version="1.0" encoding="utf-8"?>
 """
 
 doc.saveAs(OUT)
-print("Saved", OUT, "tips", drill.Tip.Name, cover.Tip.Name)
+print("Saved", OUT, "tips", drill.Tip.Name, cover.Tip.Name, fit.Tip.Name, plug.Tip.Name)
 App.closeDocument(doc.Name)
 _tmp = OUT + ".tmp"
 with zipfile.ZipFile(OUT, "r") as zin, zipfile.ZipFile(_tmp, "w") as zout:
