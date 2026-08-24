@@ -5,8 +5,47 @@ function formatDefine(value) {
   return String(value);
 }
 
+function mkdirp(FS, dir) {
+  const parts = String(dir || "")
+    .split("/")
+    .filter(Boolean);
+  let acc = "";
+  for (const part of parts) {
+    acc += `/${part}`;
+    try {
+      FS.mkdir(acc);
+    } catch {
+      /* exists */
+    }
+  }
+}
+
+function writeFiles(FS, files) {
+  mkdirp(FS, "/work");
+  for (const [rel, data] of Object.entries(files || {})) {
+    const clean = String(rel).replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!clean || clean.split("/").includes("..")) continue;
+    const full = `/work/${clean}`;
+    const slash = full.lastIndexOf("/");
+    if (slash > 0) mkdirp(FS, full.slice(0, slash));
+    if (typeof data === "string" || full.toLowerCase().endsWith(".scad")) {
+      const text =
+        typeof data === "string"
+          ? data
+          : new TextDecoder().decode(data instanceof Uint8Array ? data : new Uint8Array(data));
+      FS.writeFile(full, text);
+    } else {
+      FS.writeFile(full, data instanceof Uint8Array ? data : new Uint8Array(data));
+    }
+  }
+}
+
+function usefulLog(logs) {
+  return logs.filter((l) => l && !/localization|application path/i.test(String(l))).join("\n");
+}
+
 self.onmessage = async (event) => {
-  const { id, source, vars, preview } = event.data;
+  const { id, source, files, main, vars, preview } = event.data;
   const logs = [];
   try {
     const instance = await OpenSCAD({
@@ -15,13 +54,21 @@ self.onmessage = async (event) => {
       printErr: (t) => logs.push(String(t)),
     });
 
+    const hasFiles = files && Object.keys(files).length;
+    const mainRel = String(main || "input.scad").replace(/\\/g, "/").replace(/^\/+/, "");
+    const mainPath = hasFiles ? `/work/${mainRel}` : "/input.scad";
+
+    if (hasFiles) writeFiles(instance.FS, files);
+    else instance.FS.writeFile("/input.scad", source || "");
+
+    const raw = instance.FS.readFile(mainPath, { encoding: "utf8" });
     instance.FS.writeFile(
-      "/input.scad",
-      `${preview ? "$preview=true;\n" : "$preview=false;\n"}${source}`
+      mainPath,
+      `${preview ? "$preview=true;\n" : "$preview=false;\n"}${raw}`
     );
 
     const args = [
-      "/input.scad",
+      mainPath,
       "-o",
       "/out.stl",
       "--export-format=binstl",
@@ -30,7 +77,7 @@ self.onmessage = async (event) => {
     ];
     const exitCode = instance.callMain(args);
     if (exitCode) {
-      throw new Error(logs.slice(-40).join("\n") || `OpenSCAD exit ${exitCode}`);
+      throw new Error(usefulLog(logs) || `OpenSCAD exit ${exitCode}`);
     }
     const stl = instance.FS.readFile("/out.stl");
     const copy = stl.buffer.slice(stl.byteOffset, stl.byteOffset + stl.byteLength);

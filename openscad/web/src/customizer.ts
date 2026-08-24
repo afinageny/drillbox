@@ -1,3 +1,5 @@
+export type Vars = Record<string, string | number | boolean>;
+
 export type ParamType = "number" | "string" | "boolean";
 
 export type ParamOption = { name: string; value: string | number };
@@ -14,7 +16,7 @@ export type Param = {
   step?: number;
 };
 
-function parseLiteral(raw: string): { type: ParamType; value: string | number | boolean } {
+export function parseLiteral(raw: string): { type: ParamType; value: string | number | boolean } {
   const t = raw.trim();
   if (t === "true") return { type: "boolean", value: true };
   if (t === "false") return { type: "boolean", value: false };
@@ -101,8 +103,38 @@ export function parseCustomizer(source: string): Param[] {
 }
 
 export function formatDefine(value: string | number | boolean): string {
-  if (typeof value === "string") return `"${value.replace(/"/g, '\\"')}"`;
+  if (typeof value === "string") return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   return String(value);
 }
 
-export type Vars = Record<string, string | number | boolean>;
+export function applyVarToSource(
+  source: string,
+  name: string,
+  value: string | number | boolean
+): string {
+  const nl = source.includes("\r\n") ? "\r\n" : "\n";
+  const lines = source.split(/\r?\n/);
+  const literal = formatDefine(value);
+  let done = false;
+  const next = lines.map((line) => {
+    if (done) return line;
+    const trimmed = line.trim();
+    if (/^(module|function|include|use)\b/.test(trimmed)) {
+      done = true;
+      return line;
+    }
+    const m = line.match(/^(\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*)([^;]+);(.*)$/);
+    if (!m || m[2] !== name) return line;
+    done = true;
+    return `${m[1]}${m[2]}${m[3]}${literal};${m[5]}`;
+  });
+  return next.join(nl);
+}
+
+export function applyVarsToSource(source: string, vars: Vars): string {
+  let next = source;
+  for (const [name, value] of Object.entries(vars)) {
+    next = applyVarToSource(next, name, value);
+  }
+  return next;
+}
