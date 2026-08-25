@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
-import initialScad from "../../drillbox.scad?raw";
+import { name as initialName, source as initialScad } from "virtual:scad";
 import { applyVarsToSource, applyVarToSource, parseCustomizer, type Param, type Vars } from "./customizer";
 import { formatDiag, parseOpenScadDiagnostics, sameFile, type Diag } from "./diagnostics";
 import { Viewer } from "./Viewer";
@@ -29,9 +29,9 @@ function readBoot() {
   let project = fromUrl;
   let error: string | null = null;
   if (!fromUrl) {
-    project = defaultProject(initialScad);
+    project = defaultProject(initialScad, initialName);
   } else if (fromUrl.error || !Object.keys(fromUrl.files).length) {
-    project = defaultProject(initialScad);
+    project = defaultProject(initialScad, initialName);
     error = fromUrl.error ?? "Не удалось прочитать параметр URL";
   }
   const files = project!.files;
@@ -53,6 +53,7 @@ export function App() {
   const [openPath, setOpenPath] = useState(boot.project.main);
   const [vars, setVars] = useState<Vars>(boot.project.vars ?? {});
   const [stl, setStl] = useState<ArrayBuffer | null>(null);
+  const [parts, setParts] = useState<ArrayBuffer[] | null>(null);
   const [status, setStatus] = useState(boot.error ?? "Загрузка WASM…");
   const [err, setErr] = useState(Boolean(boot.error));
   const [busy, setBusy] = useState(false);
@@ -77,7 +78,8 @@ export function App() {
     for (const p of params) (g[p.group] ??= []).push(p);
     return g;
   }, [params]);
-  const title = main.split("/").pop() ?? "OpenSCAD";
+  const title = (main.split("/").pop() ?? "OpenSCAD").replace(/\.scad$/i, "");
+  const part = String(vars.part ?? params.find((p) => p.name === "part")?.initial ?? "assembly");
 
   const run = useCallback(
     (preview: boolean, now = false) => {
@@ -89,7 +91,7 @@ export function App() {
         setBusy(true);
         setErr(false);
         setStatus(preview ? "Превью…" : "Рендер…");
-        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js`, {
+        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=3`, {
           type: "module",
         });
         job.current.worker = worker;
@@ -111,6 +113,7 @@ export function App() {
             return;
           }
           setStl(ev.data.stl);
+          setParts(ev.data.parts ?? null);
           setErr(false);
           setDiags([]);
           setStatus(preview ? "Превью готово" : "Рендер готов");
@@ -121,12 +124,12 @@ export function App() {
           setErr(true);
           setStatus(e.message || "Ошибка worker");
         };
-        worker.postMessage({ id, files, main, vars, preview });
+        worker.postMessage({ id, files, main, vars: { ...vars, part }, preview });
       };
       if (now) start();
       else debounce.current = window.setTimeout(start, 700);
     },
-    [files, main, vars]
+    [files, main, vars, part]
   );
 
   useEffect(() => {
@@ -305,7 +308,7 @@ export function App() {
           ) : null}
         </div>
         <div className="stage">
-          <Viewer stl={stl} />
+          <Viewer stl={stl} parts={parts} part={part} />
         </div>
         <aside className="params">
           {Object.entries(grouped).map(([group, list]) => (

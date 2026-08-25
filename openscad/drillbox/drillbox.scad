@@ -1,0 +1,303 @@
+// Drillbox — sandwich lid: two mirrored trapezoids. Units: millimetres.
+
+/* [Show] */
+part = "print"; // [печатать:print, сборка:assembly, корпус:box, крышка-верх:lidSandwichTop, крышка-низ:lidSandwichBottom]
+// Сдвиг крышки, %
+lid_open = 40; // [0:1:100]
+
+/* [Box] */
+// Ширина (направление сдвига), мм
+width = 80; // [20:1:200]
+// Глубина, мм
+depth = 50; // [20:1:200]
+// Высота, мм
+height = 40; // [15:1:200]
+// Толщина стенок, мм
+thickness = 3; // [1.5:0.5:12]
+// Радиус скругления снаружи, мм (0 = половина толщины)
+fillet_radius = 1.5; // [0:0.1:8]
+
+/* [Lid] */
+// Толщина каждой половины, мм
+lid_thickness = 2; // [2:0.5:8]
+// Угол трапеции, °
+dovetail_angle = 20; // [8:1:35]
+// Зазор крышки, мм
+clearance = 0.3; // [0.1:0.05:0.8]
+// Диаметр чопиков, мм
+peg_diameter = 1.6; // [1.2:0.1:2.4]
+
+/* [Windows] */
+// Окон по ширине (X)
+window_count_x = 2; // [1:6]
+// Окон по глубине (Y)
+window_count_y = 1; // [1:6]
+// Ширина рамки, мм
+frame_width = 5; // [2:1:15]
+// Полка под лист, мм
+window_lip = 2; // [1:0.5:5]
+// Толщина листа, мм
+sheet_thickness = 1; // [0.3:0.1:1]
+
+$fa = $preview ? 8 : 5;
+$fs = $preview ? 0.8 : 0.4;
+
+function wall() = min(thickness, width / 2 - 0.8, depth / 2 - 0.8, height - 1);
+function fillet_r() =
+    min(
+        fillet_radius > 0 ? fillet_radius : wall() / 2,
+        wall() - 0.2,
+        width / 2 - 0.4,
+        depth / 2 - 0.4,
+        height / 2 - 0.4
+    );
+function lid_h() = min(lid_thickness, (height - wall() - 1) / 2);
+function flare() = min(lid_h() * tan(dovetail_angle), wall() - 0.8);
+function y_top() = depth / 2 - wall();
+function y_bot() = y_top() + flare();
+function lid_c() = min(clearance, flare() / 3, lid_h() / 4);
+function lid_len() = width - wall() - lid_c();
+function yt() = y_top() - lid_c();
+function yb() = y_bot() - lid_c();
+function lid_travel() = width - wall();
+function stack_h() = 2 * lid_h();
+
+function win_nx() = max(1, round(window_count_x));
+function win_ny() = max(1, round(window_count_y));
+function win_wx() = max(1, (lid_len() - (win_nx() + 1) * frame_width) / win_nx());
+function win_wy() = max(1, (2 * yt() - (win_ny() + 1) * frame_width) / win_ny());
+function win_cx(i) = frame_width + win_wx() / 2 + i * (win_wx() + frame_width);
+function win_cy(j) = -yt() + frame_width + win_wy() / 2 + j * (win_wy() + frame_width);
+function pocket_d() = min(sheet_thickness / 2 + 0.15, lid_h() - 0.8);
+function pocket_wx() = win_wx() + 2 * window_lip;
+function pocket_wy() = min(win_wy() + 2 * window_lip, 2 * yb() - 2);
+function peg_h() = min(lid_h() / 2, lid_h() - 0.8);
+function peg_m() = min(
+    max(1.5, fillet_r() + peg_diameter / 2 + 0.4),
+    frame_width * 0.45,
+    yt() - 1.2
+);
+function peg_d() = min(peg_diameter, frame_width * 0.45, 2 * peg_m() - 0.6);
+function peg_hole() = peg_d() + 0.22;
+
+function peg_x(i) =
+    i == 0 ? peg_m() :
+    i == win_nx() ? lid_len() - peg_m() :
+    i * (win_wx() + frame_width) + frame_width / 2;
+
+function peg_y(j) =
+    j == 0 ? -(yt() - peg_m()) :
+    j == win_ny() ? yt() - peg_m() :
+    -yt() + j * (win_wy() + frame_width) + frame_width / 2;
+
+module round_rect(len, hy, r) {
+    rr = min(max(r, 0), hy - 0.05, len / 2 - 0.05);
+    if (rr < 0.05) {
+        translate([0, -hy])
+            square([len, 2 * hy]);
+    } else {
+        hull() {
+            translate([rr, -hy + rr])
+                circle(r = rr, $fn = 28);
+            translate([len - rr, -hy + rr])
+                circle(r = rr, $fn = 28);
+            translate([rr, hy - rr])
+                circle(r = rr, $fn = 28);
+            translate([len - rr, hy - rr])
+                circle(r = rr, $fn = 28);
+        }
+    }
+}
+
+module trap_x(len, y_wide, y_narrow, h) {
+    e = min(0.2, h / 5);
+    r = fillet_r();
+    hull() {
+        linear_extrude(e)
+            round_rect(len, y_wide, r);
+        translate([0, 0, h - e])
+            linear_extrude(e)
+                round_rect(len, y_narrow, r);
+    }
+}
+
+module trap_x_inv(len, y_narrow, y_wide, h) {
+    e = min(0.2, h / 5);
+    r = fillet_r();
+    hull() {
+        linear_extrude(e)
+            round_rect(len, y_narrow, r);
+        translate([0, 0, h - e])
+            linear_extrude(e)
+                round_rect(len, y_wide, r);
+    }
+}
+
+module diamond_x(len, y_narrow, y_wide, h) {
+    e = min(0.2, h / 5);
+    r = fillet_r();
+    hull() {
+        linear_extrude(e)
+            round_rect(len, y_narrow, r);
+        translate([0, 0, h - e / 2])
+            linear_extrude(e)
+                round_rect(len, y_wide, r);
+        translate([0, 0, 2 * h - e])
+            linear_extrude(e)
+                round_rect(len, y_narrow, r);
+    }
+}
+
+module rounded_cube(size, r) {
+    rr = min(r, size[0] / 2 - 0.05, size[1] / 2 - 0.05, size[2] / 2 - 0.05);
+    if (rr < 0.05) {
+        cube(size);
+    } else {
+        hull() {
+            for (x = [rr, size[0] - rr], y = [rr, size[1] - rr]) {
+                translate([x, y, 0])
+                    cylinder(h = max(0.02, size[2] - rr), r = rr);
+                translate([x, y, size[2] - rr])
+                    sphere(rr);
+            }
+        }
+    }
+}
+
+module rounded_cavity(size, r) {
+    rr = min(r, size[0] / 2 - 0.05, size[1] / 2 - 0.05);
+    if (rr < 0.05) {
+        cube(size);
+    } else {
+        linear_extrude(size[2])
+            offset(r = rr)
+                offset(delta = -rr)
+                    square([size[0], size[1]]);
+    }
+}
+
+module box_body() {
+    t = wall();
+    h = lid_h();
+    r = fillet_r();
+    difference() {
+        translate([-width / 2, -depth / 2, 0])
+            rounded_cube([width, depth, height], r);
+        translate([-width / 2 + t, -depth / 2 + t, t])
+            rounded_cavity(
+                [width - 2 * t, depth - 2 * t, height - stack_h() - t + 0.02],
+                r
+            );
+        translate([-width / 2 - 0.05, 0, height - stack_h()])
+            diamond_x(width - t + 0.05, y_top(), y_bot(), h + 0.03);
+    }
+}
+
+module window_through() {
+    for (i = [0 : win_nx() - 1], j = [0 : win_ny() - 1])
+        translate([win_cx(i), win_cy(j), lid_h() / 2])
+            cube([win_wx(), win_wy(), lid_h() + 2], center = true);
+}
+
+module window_pockets(from_bottom) {
+    d = pocket_d();
+    z = from_bottom ? -0.02 : lid_h() - d;
+    for (i = [0 : win_nx() - 1], j = [0 : win_ny() - 1])
+        translate([win_cx(i) - pocket_wx() / 2, win_cy(j) - pocket_wy() / 2, z])
+            cube([pocket_wx(), pocket_wy(), d + 0.02]);
+}
+
+module peg_at(i, j) {
+    translate([peg_x(i), peg_y(j), 0]) children();
+}
+
+module pegs_male() {
+    h = peg_h();
+    d = peg_d();
+    for (i = [0 : win_nx()], j = [0 : win_ny()])
+        if (i == 0 || i == win_nx() || j == 0 || j == win_ny())
+            peg_at(i, j)
+                translate([0, 0, -h])
+                    cylinder(h = h + 0.02, d1 = d, d2 = d * 0.88, $fn = 20);
+}
+
+module pegs_female() {
+    h = peg_h();
+    for (i = [0 : win_nx()], j = [0 : win_ny()])
+        if (i == 0 || i == win_nx() || j == 0 || j == win_ny())
+            peg_at(i, j)
+                translate([0, 0, lid_h() - h])
+                    cylinder(h = h + 0.2, d = peg_hole(), $fn = 20);
+}
+
+module lid_upper() {
+    difference() {
+        union() {
+            trap_x(lid_len(), yb(), yt(), lid_h());
+            pegs_male();
+        }
+        window_through();
+        window_pockets(true);
+    }
+}
+
+module lid_lower() {
+    difference() {
+        trap_x_inv(lid_len(), yt(), yb(), lid_h());
+        window_through();
+        window_pockets(false);
+        pegs_female();
+    }
+}
+
+module lid_print() {
+    translate([0, 0, lid_h()]) rotate([180, 0, 0]) children();
+}
+
+module place_lid(z) {
+    translate([-lid_open / 100 * lid_travel(), 0, 0])
+        translate([-width / 2, 0, z])
+            children();
+}
+
+function layout_gap() = 12;
+function frame_x() = width / 2 + 16;
+function frame_pitch() = 2 * yb() + layout_gap();
+
+module lid_upper_layout() {
+    translate([frame_x(), -frame_pitch() / 2, 0])
+        lid_print() lid_upper();
+}
+
+module lid_lower_layout() {
+    translate([frame_x(), frame_pitch() / 2, 0])
+        lid_lower();
+}
+
+if (part == "box")
+    color("#d97757") box_body();
+else if (part == "lidSandwichTop")
+    color("#6bcb77") lid_print() lid_upper();
+else if (part == "lidSandwichTopLayout")
+    color("#6bcb77") lid_upper_layout();
+else if (part == "lidSandwichTopPlaced")
+    color("#6bcb77")
+        place_lid(height - lid_h()) lid_upper();
+else if (part == "lidSandwichBottom")
+    color("#2f6f4e") lid_print() lid_lower();
+else if (part == "lidSandwichBottomLayout")
+    color("#2f6f4e") lid_lower_layout();
+else if (part == "lidSandwichBottomPlaced")
+    color("#2f6f4e")
+        place_lid(height - stack_h()) lid_lower();
+else if (part == "assembly") {
+    color("#d97757") box_body();
+    color("#6bcb77") place_lid(height - lid_h()) lid_upper();
+    color("#2f6f4e") place_lid(height - stack_h()) lid_lower();
+} else {
+    color("#d97757") box_body();
+    color("#6bcb77") place_lid(height - lid_h()) lid_upper();
+    color("#2f6f4e") place_lid(height - stack_h()) lid_lower();
+    color("#6bcb77") lid_upper_layout();
+    color("#2f6f4e") lid_lower_layout();
+}
