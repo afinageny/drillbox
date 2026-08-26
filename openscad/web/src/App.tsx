@@ -4,6 +4,7 @@ import { name as initialName, source as initialScad } from "virtual:scad";
 import { applyVarsToSource, applyVarToSource, parseCustomizer, type Param, type Vars } from "./customizer";
 import { formatDiag, parseOpenScadDiagnostics, sameFile, type Diag } from "./diagnostics";
 import { Viewer } from "./Viewer";
+import { formatMm, sheetCutList } from "./sheetCut";
 import {
   defaultProject,
   encodeText,
@@ -80,6 +81,7 @@ export function App() {
   }, [params]);
   const title = (main.split("/").pop() ?? "OpenSCAD").replace(/\.scad$/i, "");
   const part = String(vars.part ?? params.find((p) => p.name === "part")?.initial ?? "assembly");
+  const sheet = useMemo(() => sheetCutList(vars, params), [vars, params]);
 
   const run = useCallback(
     (preview: boolean, now = false) => {
@@ -317,10 +319,33 @@ export function App() {
               {list.map((p) => (
                 <ParamField key={p.name} param={p} value={valueOf(p)} onChange={setVar} />
               ))}
+              {group === "Windows" && sheet ? <SheetCutInfo sheet={sheet} /> : null}
             </section>
           ))}
+          {sheet && !grouped.Windows ? (
+            <section>
+              <h2>Стёкла</h2>
+              <SheetCutInfo sheet={sheet} />
+            </section>
+          ) : null}
         </aside>
       </div>
+    </div>
+  );
+}
+
+function SheetCutInfo({
+  sheet,
+}: {
+  sheet: { count: number; width: number; depth: number; thickness: number };
+}) {
+  return (
+    <div className="sheet-cut">
+      <div className="sheet-cut-count">окна {sheet.count} шт.</div>
+      <div className="sheet-cut-size">
+        {formatMm(sheet.width)} × {formatMm(sheet.depth)} × {formatMm(sheet.thickness)} мм
+      </div>
+      <div className="sheet-cut-hint">ширина × глубина × толщина, в карман окна</div>
     </div>
   );
 }

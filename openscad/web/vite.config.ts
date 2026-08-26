@@ -6,7 +6,8 @@ import { defineConfig, searchForWorkspaceRoot, type Plugin } from "vite";
 
 const webRoot = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SCAD = path.resolve(webRoot, "../drillbox/drillbox.scad");
-const pagesBase = process.env.GITHUB_PAGES === "true" ? "/drillbox/" : "/";
+const repoName = process.env.GITHUB_REPOSITORY?.split("/")[1];
+const pagesBase = process.env.GITHUB_PAGES === "true" && repoName ? `/${repoName}/` : "/";
 
 function resolveScadFile(): string {
   const spec = process.env.SCAD?.trim();

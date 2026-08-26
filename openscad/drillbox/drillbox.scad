@@ -18,8 +18,8 @@ thickness = 3; // [1.5:0.5:12]
 fillet_radius = 1.5; // [0:0.1:8]
 
 /* [Lid] */
-// Толщина каждой половины, мм
-lid_thickness = 2; // [2:0.5:8]
+// Толщина каждой половины, мм (0 = половина толщины стенок)
+lid_thickness = 0; // [0:0.5:8]
 // Угол трапеции, °
 dovetail_angle = 20; // [8:1:35]
 // Зазор крышки, мм
@@ -51,7 +51,7 @@ function fillet_r() =
         depth / 2 - 0.4,
         height / 2 - 0.4
     );
-function lid_h() = min(lid_thickness, (height - wall() - 1) / 2);
+function lid_h() = min(lid_thickness > 0 ? lid_thickness : wall() / 2, (height - wall() - 1) / 2);
 function flare() = min(lid_h() * tan(dovetail_angle), wall() - 0.8);
 function y_top() = depth / 2 - wall();
 function y_bot() = y_top() + flare();

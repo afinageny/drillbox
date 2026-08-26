@@ -72,6 +72,16 @@ html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(-
 }
 .row { display: flex; gap: 8px; align-items: center; }
 .row input[type="number"] { width: 72px; }
+.sheet-cut {
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: #111318;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.sheet-cut-count { font-size: 13px; color: var(--text); }
+.sheet-cut-size { font-size: 16px; font-weight: 650; margin-top: 2px; letter-spacing: 0.01em; }
+.sheet-cut-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
 @media (max-width: 960px) {
   .work { grid-template-columns: 1fr; grid-template-rows: 40vh 40vh auto; }
