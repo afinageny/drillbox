@@ -13,6 +13,7 @@ import {
   loadProjectFromUrl,
   MAX_SHARE_URL,
   readVarsFromParams,
+  clearShareUrl,
   replaceShareUrl,
   scadPaths,
   shareUrl,
@@ -50,7 +51,7 @@ function readBoot() {
 export function App() {
   const [boot] = useState(readBoot);
   const [files, setFiles] = useState(boot.project.files);
-  const [main] = useState(boot.project.main);
+  const [main, setMain] = useState(boot.project.main);
   const [openPath, setOpenPath] = useState(boot.project.main);
   const [vars, setVars] = useState<Vars>(boot.project.vars ?? {});
   const [stl, setStl] = useState<ArrayBuffer | null>(null);
@@ -93,7 +94,7 @@ export function App() {
         setBusy(true);
         setErr(false);
         setStatus(preview ? "Превью…" : "Рендер…");
-        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=3`, {
+        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=4`, {
           type: "module",
         });
         job.current.worker = worker;
@@ -217,6 +218,20 @@ export function App() {
     URL.revokeObjectURL(a.href);
   }
 
+  function resetToDefault() {
+    skipUrlSync.current = true;
+    window.clearTimeout(urlDebounce.current);
+    const fresh = defaultProject(initialScad, initialName);
+    setFiles(fresh.files);
+    setMain(fresh.main);
+    setOpenPath(fresh.main);
+    setVars({});
+    setDiags([]);
+    setErr(false);
+    setStatus("Модель по умолчанию");
+    clearShareUrl();
+  }
+
   async function copyShareLink() {
     const url = shareUrl(files, main, vars);
     if (url.length > MAX_SHARE_URL) {
@@ -263,6 +278,9 @@ export function App() {
         </button>
         <button disabled={busy} onClick={copyShareLink}>
           Ссылка
+        </button>
+        <button disabled={busy} onClick={resetToDefault} title="Убрать модель из адреса, показать встроенную">
+          Сброс
         </button>
         <span className={`status ${err ? "err" : "ok"}`}>{status}</span>
       </header>

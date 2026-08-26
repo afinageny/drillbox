@@ -112,13 +112,7 @@ self.onmessage = async (event) => {
     if (part === "assembly" || part === "print") {
       const names =
         part === "print"
-          ? [
-              "box",
-              "lidSandwichTopPlaced",
-              "lidSandwichBottomPlaced",
-              "lidSandwichTopLayout",
-              "lidSandwichBottomLayout",
-            ]
+          ? ["box", "lidSandwichTopLayout", "lidSandwichBottomLayout"]
           : ["box", "lidSandwichTopPlaced", "lidSandwichBottomPlaced"];
       const parts = [];
       for (const name of names) {

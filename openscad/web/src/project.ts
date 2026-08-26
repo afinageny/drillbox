@@ -122,6 +122,14 @@ export function replaceShareUrl(
   return true;
 }
 
+export function clearShareUrl() {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  if (location.search === "" && location.hash === "") return;
+  history.replaceState(null, "", url);
+}
+
 export function projectToHash(files: Record<string, Uint8Array>, main: string, vars: Vars = {}): string {
   const names = Object.keys(files);
   const query = new URLSearchParams();

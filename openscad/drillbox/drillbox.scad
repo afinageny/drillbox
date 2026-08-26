@@ -286,8 +286,6 @@ else if (part == "assembly") {
     color("#2f6f4e") place_lid(height - stack_h()) lid_lower();
 } else {
     color("#d97757") box_body();
-    color("#6bcb77") place_lid(height - lid_h()) lid_upper();
-    color("#2f6f4e") place_lid(height - stack_h()) lid_lower();
     color("#6bcb77") lid_upper_layout();
     color("#2f6f4e") lid_lower_layout();
 }
