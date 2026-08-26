@@ -90,61 +90,35 @@ function peg_y(j) =
     j == win_ny() ? yt() - peg_m() :
     -yt() + j * (win_wy() + frame_width) + frame_width / 2;
 
-module round_rect(len, hy, r) {
-    rr = min(max(r, 0), hy - 0.05, len / 2 - 0.05);
-    if (rr < 0.05) {
-        translate([0, -hy])
-            square([len, 2 * hy]);
-    } else {
-        hull() {
-            translate([rr, -hy + rr])
-                circle(r = rr, $fn = 28);
-            translate([len - rr, -hy + rr])
-                circle(r = rr, $fn = 28);
-            translate([rr, hy - rr])
-                circle(r = rr, $fn = 28);
-            translate([len - rr, hy - rr])
-                circle(r = rr, $fn = 28);
-        }
-    }
-}
-
 module trap_x(len, y_wide, y_narrow, h) {
     e = min(0.2, h / 5);
-    r = fillet_r();
     hull() {
-        linear_extrude(e)
-            round_rect(len, y_wide, r);
-        translate([0, 0, h - e])
-            linear_extrude(e)
-                round_rect(len, y_narrow, r);
+        translate([0, -y_wide, 0])
+            cube([len, 2 * y_wide, e]);
+        translate([0, -y_narrow, h - e])
+            cube([len, 2 * y_narrow, e]);
     }
 }
 
 module trap_x_inv(len, y_narrow, y_wide, h) {
     e = min(0.2, h / 5);
-    r = fillet_r();
     hull() {
-        linear_extrude(e)
-            round_rect(len, y_narrow, r);
-        translate([0, 0, h - e])
-            linear_extrude(e)
-                round_rect(len, y_wide, r);
+        translate([0, -y_narrow, 0])
+            cube([len, 2 * y_narrow, e]);
+        translate([0, -y_wide, h - e])
+            cube([len, 2 * y_wide, e]);
     }
 }
 
 module diamond_x(len, y_narrow, y_wide, h) {
     e = min(0.2, h / 5);
-    r = fillet_r();
     hull() {
-        linear_extrude(e)
-            round_rect(len, y_narrow, r);
-        translate([0, 0, h - e / 2])
-            linear_extrude(e)
-                round_rect(len, y_wide, r);
-        translate([0, 0, 2 * h - e])
-            linear_extrude(e)
-                round_rect(len, y_narrow, r);
+        translate([0, -y_narrow, 0])
+            cube([len, 2 * y_narrow, e]);
+        translate([0, -y_wide, h - e / 2])
+            cube([len, 2 * y_wide, e]);
+        translate([0, -y_narrow, 2 * h - e])
+            cube([len, 2 * y_narrow, e]);
     }
 }
 
@@ -188,8 +162,23 @@ module box_body() {
                 [width - 2 * t, depth - 2 * t, height - stack_h() - t + 0.02],
                 r
             );
-        translate([-width / 2 - 0.05, 0, height - stack_h()])
-            diamond_x(width - t + 0.05, y_top(), y_bot(), h + 0.03);
+        translate([-width / 2 - r - 0.4, 0, height - stack_h()])
+            diamond_x(width - t + r + 0.4, y_top(), y_bot(), h + 0.03);
+    }
+}
+
+module lid_top_entry_fillet() {
+    r = min(fillet_r(), lid_h() - 0.25);
+    if (r > 0.2) {
+        hy = yb() + 1;
+        translate([0, -hy, lid_h() - r])
+            difference() {
+                translate([-0.05, 0, 0])
+                    cube([r + 0.05, 2 * hy, r + 0.05]);
+                translate([r, -0.1, 0])
+                    rotate([-90, 0, 0])
+                        cylinder(h = 2 * hy + 0.2, r = r, $fn = 28);
+            }
     }
 }
 
@@ -238,6 +227,7 @@ module lid_upper() {
         }
         window_through();
         window_pockets(true);
+        lid_top_entry_fillet();
     }
 }
 
