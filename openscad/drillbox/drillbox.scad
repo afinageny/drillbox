@@ -56,10 +56,11 @@ function flare() = min(lid_h() * tan(dovetail_angle), wall() - 0.8);
 function y_top() = depth / 2 - wall();
 function y_bot() = y_top() + flare();
 function lid_c() = min(clearance, flare() / 3, lid_h() / 4);
-function lid_len() = width - wall() - lid_c();
+function stop_keep() = max(0.8, wall() - fillet_r());
+function lid_len() = width - stop_keep();
 function yt() = y_top() - lid_c();
 function yb() = y_bot() - lid_c();
-function lid_travel() = width - wall();
+function lid_travel() = lid_len();
 function stack_h() = 2 * lid_h();
 
 function win_nx() = max(1, round(window_count_x));
@@ -110,18 +111,6 @@ module trap_x_inv(len, y_narrow, y_wide, h) {
     }
 }
 
-module diamond_x(len, y_narrow, y_wide, h) {
-    e = min(0.2, h / 5);
-    hull() {
-        translate([0, -y_narrow, 0])
-            cube([len, 2 * y_narrow, e]);
-        translate([0, -y_wide, h - e / 2])
-            cube([len, 2 * y_wide, e]);
-        translate([0, -y_narrow, 2 * h - e])
-            cube([len, 2 * y_narrow, e]);
-    }
-}
-
 module rounded_cube(size, r) {
     rr = min(r, size[0] / 2 - 0.05, size[1] / 2 - 0.05, size[2] / 2 - 0.05);
     if (rr < 0.05) {
@@ -150,9 +139,72 @@ module rounded_cavity(size, r) {
     }
 }
 
+module lid_end_fillets(len, hy, h) {
+    r = min(fillet_r(), h - 0.25);
+    if (r > 0.2) {
+        translate([0, -hy, h - r])
+            difference() {
+                translate([-0.05, 0, 0])
+                    cube([r + 0.05, 2 * hy, r + 0.05]);
+                translate([r, -0.1, 0])
+                    rotate([-90, 0, 0])
+                        cylinder(h = 2 * hy + 0.2, r = r, $fn = 28);
+            }
+        translate([len, -hy, h - r])
+            difference() {
+                translate([-r, 0, 0])
+                    cube([r + 0.05, 2 * hy, r + 0.05]);
+                translate([-r, -0.1, 0])
+                    rotate([-90, 0, 0])
+                        cylinder(h = 2 * hy + 0.2, r = r, $fn = 28);
+            }
+    }
+}
+
+module lid_frame(len, y_narrow, y_wide, h) {
+    difference() {
+        union() {
+            trap_x_inv(len, y_narrow, y_wide, h);
+            translate([0, 0, h])
+                trap_x(len, y_wide, y_narrow, h);
+        }
+        translate([0, 0, h])
+            lid_end_fillets(len, y_wide + 1, h);
+    }
+}
+
+module lid_cavity() {
+    translate([0, 0, -0.04])
+        lid_frame(lid_len(), y_top(), y_bot(), lid_h() + 0.08);
+}
+
+module limiter_follow_lid() {
+    r = min(fillet_r(), lid_h() - 0.25);
+    if (r > 0.2) {
+        g = lid_c();
+        hy = y_bot() + 1;
+        translate([-width / 2 + lid_len() - r, -hy, height - r])
+            intersection() {
+                translate([r - 0.02, 0, 0])
+                    cube([r + g + 0.4, 2 * hy, r + 0.2]);
+                rotate([-90, 0, 0])
+                    cylinder(h = 2 * hy, r = r + g, $fn = 32);
+            }
+    }
+}
+
+module box_lid_groove() {
+    r = fillet_r();
+    translate([-width / 2, 0, height - stack_h()]) {
+        lid_cavity();
+        translate([-r - 0.4, 0, 0])
+            lid_cavity();
+    }
+    limiter_follow_lid();
+}
+
 module box_body() {
     t = wall();
-    h = lid_h();
     r = fillet_r();
     difference() {
         translate([-width / 2, -depth / 2, 0])
@@ -162,24 +214,12 @@ module box_body() {
                 [width - 2 * t, depth - 2 * t, height - stack_h() - t + 0.02],
                 r
             );
-        translate([-width / 2 - r - 0.4, 0, height - stack_h()])
-            diamond_x(width - t + r + 0.4, y_top(), y_bot(), h + 0.03);
+        box_lid_groove();
     }
 }
 
-module lid_top_entry_fillet() {
-    r = min(fillet_r(), lid_h() - 0.25);
-    if (r > 0.2) {
-        hy = yb() + 1;
-        translate([0, -hy, lid_h() - r])
-            difference() {
-                translate([-0.05, 0, 0])
-                    cube([r + 0.05, 2 * hy, r + 0.05]);
-                translate([r, -0.1, 0])
-                    rotate([-90, 0, 0])
-                        cylinder(h = 2 * hy + 0.2, r = r, $fn = 28);
-            }
-    }
+module lid_top_end_fillets() {
+    lid_end_fillets(lid_len(), yb() + 1, lid_h());
 }
 
 module window_through() {
@@ -227,7 +267,7 @@ module lid_upper() {
         }
         window_through();
         window_pockets(true);
-        lid_top_entry_fillet();
+        lid_top_end_fillets();
     }
 }
 

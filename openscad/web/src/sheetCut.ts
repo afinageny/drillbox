@@ -11,6 +11,7 @@ const NEEDED = [
   "depth",
   "height",
   "thickness",
+  "fillet_radius",
   "lid_thickness",
   "dovetail_angle",
   "clearance",
@@ -44,13 +45,22 @@ export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
   const windowLip = num(vars, params, "window_lip", 2);
   const sheetThickness = num(vars, params, "sheet_thickness", 1);
 
+  const filletRadius = num(vars, params, "fillet_radius", 1.5);
   const wall = Math.min(thickness, width / 2 - 0.8, depth / 2 - 0.8, height - 1);
+  const filletR = Math.min(
+    filletRadius > 0 ? filletRadius : wall / 2,
+    wall - 0.2,
+    width / 2 - 0.4,
+    depth / 2 - 0.4,
+    height / 2 - 0.4
+  );
   const lidH = Math.min(lidThickness > 0 ? lidThickness : wall / 2, (height - wall - 1) / 2);
   const flare = Math.min(lidH * Math.tan((angle * Math.PI) / 180), wall - 0.8);
   const yTop = depth / 2 - wall;
   const yBot = yTop + flare;
   const lidC = Math.min(clearance, flare / 3, lidH / 4);
-  const lidLen = width - wall - lidC;
+  const stopKeep = Math.max(0.8, wall - filletR);
+  const lidLen = width - stopKeep;
   const yt = yTop - lidC;
   const yb = yBot - lidC;
   const nx = Math.max(1, Math.round(windowCountX));
