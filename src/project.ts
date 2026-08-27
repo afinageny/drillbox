@@ -11,7 +11,7 @@ export type Project = {
   error?: string;
 };
 
-export function defaultProject(scad: string, name = "drillbox.scad"): Project {
+export function defaultProject(scad: string, name = "lidbox.scad"): Project {
   return { files: { [name]: encodeText(scad) }, main: name };
 }
 

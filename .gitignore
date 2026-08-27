@@ -8,7 +8,7 @@ __pycache__/
 ozon-monitor/
 
 # OpenSCAD playground
-openscad/web/node_modules/
-openscad/web/dist/
-openscad/web/public/wasm/
-openscad/web/public/openscad-wasm.zip
+node_modules/
+dist/
+public/wasm/
+public/openscad-wasm.zip

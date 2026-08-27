@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from "vite";
 
 const webRoot = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_SCAD = path.resolve(webRoot, "../drillbox/drillbox.scad");
+const DEFAULT_SCAD = path.resolve(webRoot, "openscad/lidbox.scad");
 const repoName = process.env.GITHUB_REPOSITORY?.split("/")[1];
 const pagesBase = process.env.GITHUB_PAGES === "true" && repoName ? `/${repoName}/` : "/";
 
@@ -62,7 +62,7 @@ export default defineConfig({
     port: 5173,
     host: "127.0.0.1",
     fs: {
-      allow: ["..", searchForWorkspaceRoot(webRoot), path.dirname(scadFile)],
+      allow: [webRoot, searchForWorkspaceRoot(webRoot), path.dirname(scadFile)],
     },
   },
 });
