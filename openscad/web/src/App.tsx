@@ -335,7 +335,12 @@ export function App() {
             <section key={group}>
               <h2>{group}</h2>
               {list.map((p) => (
-                <ParamField key={p.name} param={p} value={valueOf(p)} onChange={setVar} />
+                <ParamField
+                  key={p.name}
+                  param={boundParam(p, vars, params)}
+                  value={valueOf(p)}
+                  onChange={setVar}
+                />
               ))}
               {group === "Windows" && sheet ? <SheetCutInfo sheet={sheet} /> : null}
             </section>
@@ -350,6 +355,22 @@ export function App() {
       </div>
     </div>
   );
+}
+
+function boundParam(param: Param, vars: Vars, params: Param[]): Param {
+  if (param.name !== "fillet_radius") return param;
+  const n = (name: string, fallback: number) => {
+    const p = params.find((x) => x.name === name);
+    const v = vars[name] ?? p?.initial ?? fallback;
+    return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  };
+  const wall = Math.min(
+    n("thickness", 3),
+    n("width", 80) / 2 - 0.8,
+    n("depth", 50) / 2 - 0.8,
+    n("height", 40) - 1
+  );
+  return { ...param, min: 0, max: Math.max(0, wall / 2), step: 0.1 };
 }
 
 function SheetCutInfo({
@@ -418,6 +439,10 @@ function ParamField({
   }
   if (param.type === "number") {
     const n = Number(value);
+    const shown =
+      param.min != null && param.max != null
+        ? Math.min(param.max, Math.max(param.min, n))
+        : n;
     return (
       <div className="field">
         <label>
@@ -431,7 +456,7 @@ function ParamField({
               min={param.min}
               max={param.max}
               step={param.step ?? 1}
-              value={n}
+              value={shown}
               onChange={(e) => onChange(param.name, Number(e.target.value))}
             />
           ) : null}
@@ -440,7 +465,7 @@ function ParamField({
             min={param.min}
             max={param.max}
             step={param.step ?? 1}
-            value={n}
+            value={shown}
             onChange={(e) => onChange(param.name, Number(e.target.value))}
           />
         </div>

@@ -48,8 +48,8 @@ export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
   const filletRadius = num(vars, params, "fillet_radius", 1.5);
   const wall = Math.min(thickness, width / 2 - 0.8, depth / 2 - 0.8, height - 1);
   const filletR = Math.min(
-    filletRadius > 0 ? filletRadius : wall / 2,
-    wall - 0.2,
+    Math.max(0, filletRadius),
+    wall / 2,
     width / 2 - 0.4,
     depth / 2 - 0.4,
     height / 2 - 0.4

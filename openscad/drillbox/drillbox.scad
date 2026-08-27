@@ -14,8 +14,8 @@ depth = 50; // [20:1:200]
 height = 40; // [15:1:200]
 // Толщина стенок, мм
 thickness = 3; // [1.5:0.5:12]
-// Радиус скругления снаружи, мм (0 = половина толщины)
-fillet_radius = 1.5; // [0:0.1:8]
+// Радиус скругления снаружи, мм
+fillet_radius = 1.5; // [0:0.1:6]
 
 /* [Lid] */
 // Толщина каждой половины, мм (0 = половина толщины стенок)
@@ -45,13 +45,14 @@ $fs = $preview ? 0.8 : 0.4;
 function wall() = min(thickness, width / 2 - 0.8, depth / 2 - 0.8, height - 1);
 function fillet_r() =
     min(
-        fillet_radius > 0 ? fillet_radius : wall() / 2,
-        wall() - 0.2,
+        max(0, fillet_radius),
+        wall() / 2,
         width / 2 - 0.4,
         depth / 2 - 0.4,
         height / 2 - 0.4
     );
 function lid_h() = min(lid_thickness > 0 ? lid_thickness : wall() / 2, (height - wall() - 1) / 2);
+function end_fillet_r() = fillet_r();
 function flare() = min(lid_h() * tan(dovetail_angle), wall() - 0.8);
 function y_top() = depth / 2 - wall();
 function y_bot() = y_top() + flare();
@@ -140,7 +141,7 @@ module rounded_cavity(size, r) {
 }
 
 module lid_end_fillets(len, hy, h) {
-    r = min(fillet_r(), h - 0.25);
+    r = end_fillet_r();
     if (r > 0.2) {
         translate([0, -hy, h - r])
             difference() {
@@ -148,7 +149,7 @@ module lid_end_fillets(len, hy, h) {
                     cube([r + 0.05, 2 * hy, r + 0.05]);
                 translate([r, -0.1, 0])
                     rotate([-90, 0, 0])
-                        cylinder(h = 2 * hy + 0.2, r = r, $fn = 28);
+                        cylinder(h = 2 * hy + 0.2, r = r);
             }
         translate([len, -hy, h - r])
             difference() {
@@ -156,7 +157,7 @@ module lid_end_fillets(len, hy, h) {
                     cube([r + 0.05, 2 * hy, r + 0.05]);
                 translate([-r, -0.1, 0])
                     rotate([-90, 0, 0])
-                        cylinder(h = 2 * hy + 0.2, r = r, $fn = 28);
+                        cylinder(h = 2 * hy + 0.2, r = r);
             }
     }
 }
@@ -179,7 +180,7 @@ module lid_cavity() {
 }
 
 module limiter_follow_lid() {
-    r = min(fillet_r(), lid_h() - 0.25);
+    r = end_fillet_r();
     if (r > 0.2) {
         g = lid_c();
         hy = y_bot() + 1;
@@ -188,7 +189,7 @@ module limiter_follow_lid() {
                 translate([r - 0.02, 0, 0])
                     cube([r + g + 0.4, 2 * hy, r + 0.2]);
                 rotate([-90, 0, 0])
-                    cylinder(h = 2 * hy, r = r + g, $fn = 32);
+                    cylinder(h = 2 * hy, r = r + g);
             }
     }
 }
