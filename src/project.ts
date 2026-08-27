@@ -25,6 +25,53 @@ export function readUrlParams(): URLSearchParams {
   return merged;
 }
 
+export function requestedCatalogFile(params: URLSearchParams = readUrlParams()): string | null {
+  const raw = params.get("file") ?? params.get("model");
+  if (!raw) return null;
+  const base = raw.replace(/\\/g, "/").split("/").pop() ?? "";
+  if (!base) return null;
+  return base.toLowerCase().endsWith(".scad") ? base : `${base}.scad`;
+}
+
+export function pickCatalogFile(
+  catalog: Record<string, string>,
+  requested?: string | null
+): { name: string; source: string } | null {
+  if (!requested) return null;
+  const want = requested.toLowerCase();
+  const name = Object.keys(catalog).find((key) => key.toLowerCase() === want);
+  if (!name) return null;
+  return { name, source: catalog[name] };
+}
+
+export function catalogFileUrl(name: string, vars: Vars = {}): string {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("file", name);
+  for (const [key, value] of Object.entries(vars)) {
+    url.searchParams.set(`d.${key}`, String(value));
+  }
+  return url.toString();
+}
+
+export function syncProjectUrl(
+  files: Record<string, Uint8Array>,
+  main: string,
+  vars: Vars,
+  catalog: Record<string, string>
+): boolean {
+  if (isSingleScad(files) && catalog[main] === fileText(files, main)) {
+    const next = new URL(catalogFileUrl(main, vars));
+    if (location.pathname === next.pathname && location.search === next.search && location.hash === next.hash) {
+      return true;
+    }
+    history.replaceState(null, "", next);
+    return true;
+  }
+  return replaceShareUrl(files, main, vars);
+}
+
 export function readVarsFromParams(params: URLSearchParams = readUrlParams()): Vars {
   const vars: Vars = {};
   for (const [key, value] of params) {

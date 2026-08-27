@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const argv = process.argv.slice(2);
 const rest = [];
 let scad;
+const viteCmds = new Set(["build", "preview", "optimize", "dev"]);
 
 for (let i = 0; i < argv.length; i++) {
   const arg = argv[i];
@@ -18,6 +19,10 @@ for (let i = 0; i < argv.length; i++) {
     continue;
   }
   if (arg.toLowerCase().endsWith(".scad") && !arg.startsWith("-")) {
+    scad = arg;
+    continue;
+  }
+  if (!arg.startsWith("-") && !viteCmds.has(arg) && !arg.includes("=")) {
     scad = arg;
     continue;
   }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { name as initialName, source as initialScad } from "virtual:scad";
+import { files as scadCatalog, defaultName as catalogDefault } from "virtual:scad-catalog";
 import { applyVarsToSource, applyVarToSource, parseCustomizer, type Param, type Vars } from "./customizer";
 import { formatDiag, parseOpenScadDiagnostics, sameFile, type Diag } from "./diagnostics";
 import { Viewer } from "./Viewer";
@@ -12,17 +13,31 @@ import {
   isSingleScad,
   loadProjectFromUrl,
   MAX_SHARE_URL,
+  pickCatalogFile,
   readVarsFromParams,
+  requestedCatalogFile,
   clearShareUrl,
-  replaceShareUrl,
   scadPaths,
   shareUrl,
+  syncProjectUrl,
 } from "./project";
 
 type Job = {
   id: number;
   preview: boolean;
 };
+
+function catalogNames() {
+  return Object.keys(scadCatalog).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function bootModel() {
+  return (
+    pickCatalogFile(scadCatalog, requestedCatalogFile()) ??
+    pickCatalogFile(scadCatalog, catalogDefault) ??
+    pickCatalogFile(scadCatalog, initialName) ?? { name: initialName, source: initialScad }
+  );
+}
 
 function readBoot() {
   const fromUrl = loadProjectFromUrl();
@@ -31,9 +46,11 @@ function readBoot() {
   let project = fromUrl;
   let error: string | null = null;
   if (!fromUrl) {
-    project = defaultProject(initialScad, initialName);
+    const model = bootModel();
+    project = defaultProject(model.source, model.name);
   } else if (fromUrl.error || !Object.keys(fromUrl.files).length) {
-    project = defaultProject(initialScad, initialName);
+    const model = bootModel();
+    project = defaultProject(model.source, model.name);
     error = fromUrl.error ?? "Не удалось прочитать параметр URL";
   }
   const files = project!.files;
@@ -181,7 +198,7 @@ export function App() {
         return;
       }
       skipUrlSync.current = false;
-      replaceShareUrl(files, main, vars);
+      syncProjectUrl(files, main, vars, scadCatalog);
     }, 350);
     return () => window.clearTimeout(urlDebounce.current);
   }, [files, main, vars]);
@@ -221,7 +238,10 @@ export function App() {
   function resetToDefault() {
     skipUrlSync.current = true;
     window.clearTimeout(urlDebounce.current);
-    const fresh = defaultProject(initialScad, initialName);
+    const model =
+      pickCatalogFile(scadCatalog, catalogDefault) ??
+      pickCatalogFile(scadCatalog, initialName) ?? { name: initialName, source: initialScad };
+    const fresh = defaultProject(model.source, model.name);
     setFiles(fresh.files);
     setMain(fresh.main);
     setOpenPath(fresh.main);
@@ -230,6 +250,21 @@ export function App() {
     setErr(false);
     setStatus("Модель по умолчанию");
     clearShareUrl();
+  }
+
+  function loadCatalogModel(name: string) {
+    const hit = pickCatalogFile(scadCatalog, name);
+    if (!hit) return;
+    skipUrlSync.current = true;
+    window.clearTimeout(urlDebounce.current);
+    const fresh = defaultProject(hit.source, hit.name);
+    setFiles(fresh.files);
+    setMain(fresh.main);
+    setOpenPath(fresh.main);
+    setVars({});
+    setDiags([]);
+    setErr(false);
+    setStatus(hit.name);
   }
 
   async function copyShareLink() {
@@ -254,6 +289,20 @@ export function App() {
     <div className="app">
       <header className="toolbar">
         <h1 title={main}>{title}</h1>
+        {catalogNames().length ? (
+          <select
+            value={main in scadCatalog ? main : ""}
+            onChange={(e) => loadCatalogModel(e.target.value)}
+            title="Файл из openscad/"
+          >
+            {main in scadCatalog ? null : <option value="">свой файл</option>}
+            {catalogNames().map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        ) : null}
         {paths.length > 1 ? (
           <select
             value={openPath}
