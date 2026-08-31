@@ -99,6 +99,11 @@ export function App() {
   }, [params]);
   const title = (main.split("/").pop() ?? "OpenSCAD").replace(/\.scad$/i, "");
   const part = String(vars.part ?? params.find((p) => p.name === "part")?.initial ?? "assembly");
+  const previewVars = useMemo(() => {
+    const next: Vars = {};
+    for (const p of params) next[p.name] = p.initial;
+    return { ...next, ...vars };
+  }, [params, vars]);
   const sheet = useMemo(() => sheetCutList(vars, params), [vars, params]);
 
   const run = useCallback(
@@ -377,7 +382,7 @@ export function App() {
           ) : null}
         </div>
         <div className="stage">
-          <Viewer stl={stl} parts={parts} part={part} />
+          <Viewer stl={stl} parts={parts} part={part} vars={previewVars} />
         </div>
         <aside className="params">
           {Object.entries(grouped).map(([group, list]) => (
@@ -517,6 +522,25 @@ function ParamField({
             value={shown}
             onChange={(e) => onChange(param.name, Number(e.target.value))}
           />
+        </div>
+      </div>
+    );
+  }
+  const hex = String(value).trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+    return (
+      <div className="field">
+        <label>
+          {label}
+          {param.caption ? <span className="name">{param.name}</span> : null}
+        </label>
+        <div className="row">
+          <input
+            type="color"
+            value={hex}
+            onChange={(e) => onChange(param.name, e.target.value)}
+          />
+          <input type="text" value={hex} onChange={(e) => onChange(param.name, e.target.value)} />
         </div>
       </div>
     );

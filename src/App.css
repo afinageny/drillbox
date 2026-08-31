@@ -72,6 +72,16 @@ html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(-
 }
 .row { display: flex; gap: 8px; align-items: center; }
 .row input[type="number"] { width: 72px; }
+.row input[type="text"] { flex: 1; }
+.field input[type="color"] {
+  width: 36px;
+  height: 28px;
+  padding: 2px;
+  background: #111318;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
 .sheet-cut {
   margin-top: 4px;
   padding: 8px 10px;

@@ -39,6 +39,14 @@ window_lip = 2; // [1:0.5:5]
 // Толщина листа, мм
 sheet_thickness = 1; // [0.3:0.1:1]
 
+/* [Colors] */
+// Корпус
+color_box = "#d97757";
+// Крышка верх
+color_lid_upper = "#6bcb77";
+// Крышка низ
+color_lid_lower = "#2f6f4e";
+
 $fa = $preview ? 8 : 5;
 $fs = $preview ? 0.8 : 0.4;
 
@@ -66,9 +74,10 @@ function stack_h() = 2 * lid_h();
 
 function win_nx() = max(1, round(window_count_x));
 function win_ny() = max(1, round(window_count_y));
-function win_wx() = max(1, (lid_len() - (win_nx() + 1) * frame_width) / win_nx());
+function frame_x0() = frame_width + wall();
+function win_wx() = max(1, (lid_len() - frame_x0() - win_nx() * frame_width) / win_nx());
 function win_wy() = max(1, (2 * yt() - (win_ny() + 1) * frame_width) / win_ny());
-function win_cx(i) = frame_width + win_wx() / 2 + i * (win_wx() + frame_width);
+function win_cx(i) = frame_x0() + win_wx() / 2 + i * (win_wx() + frame_width);
 function win_cy(j) = -yt() + frame_width + win_wy() / 2 + j * (win_wy() + frame_width);
 function pocket_d() = min(sheet_thickness / 2 + 0.15, lid_h() - 0.8);
 function pocket_wx() = win_wx() + 2 * window_lip;
@@ -85,7 +94,7 @@ function peg_hole() = peg_d() + 0.22;
 function peg_x(i) =
     i == 0 ? peg_m() :
     i == win_nx() ? lid_len() - peg_m() :
-    i * (win_wx() + frame_width) + frame_width / 2;
+    frame_x0() - frame_width / 2 + i * (win_wx() + frame_width);
 
 function peg_y(j) =
     j == 0 ? -(yt() - peg_m()) :
@@ -306,27 +315,27 @@ module lid_lower_layout() {
 }
 
 if (part == "box")
-    color("#d97757") box_body();
+    color(color_box) box_body();
 else if (part == "lidSandwichTop")
-    color("#6bcb77") lid_print() lid_upper();
+    color(color_lid_upper) lid_print() lid_upper();
 else if (part == "lidSandwichTopLayout")
-    color("#6bcb77") lid_upper_layout();
+    color(color_lid_upper) lid_upper_layout();
 else if (part == "lidSandwichTopPlaced")
-    color("#6bcb77")
+    color(color_lid_upper)
         place_lid(height - lid_h()) lid_upper();
 else if (part == "lidSandwichBottom")
-    color("#2f6f4e") lid_print() lid_lower();
+    color(color_lid_lower) lid_print() lid_lower();
 else if (part == "lidSandwichBottomLayout")
-    color("#2f6f4e") lid_lower_layout();
+    color(color_lid_lower) lid_lower_layout();
 else if (part == "lidSandwichBottomPlaced")
-    color("#2f6f4e")
+    color(color_lid_lower)
         place_lid(height - stack_h()) lid_lower();
 else if (part == "assembly") {
-    color("#d97757") box_body();
-    color("#6bcb77") place_lid(height - lid_h()) lid_upper();
-    color("#2f6f4e") place_lid(height - stack_h()) lid_lower();
+    color(color_box) box_body();
+    color(color_lid_upper) place_lid(height - lid_h()) lid_upper();
+    color(color_lid_lower) place_lid(height - stack_h()) lid_lower();
 } else {
-    color("#d97757") box_body();
-    color("#6bcb77") lid_upper_layout();
-    color("#2f6f4e") lid_lower_layout();
+    color(color_box) box_body();
+    color(color_lid_upper) lid_upper_layout();
+    color(color_lid_lower) lid_lower_layout();
 }

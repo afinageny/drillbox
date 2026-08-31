@@ -2,32 +2,50 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import type { Vars } from "./customizer";
 
-const PART_COLORS: Record<string, number> = {
+const FALLBACK = {
   box: 0xd97757,
-  lidSandwichTop: 0x6bcb77,
-  lidSandwichTopPlaced: 0x6bcb77,
-  lidSandwichTopLayout: 0x6bcb77,
-  lidSandwichBottom: 0x2f6f4e,
-  lidSandwichBottomPlaced: 0x2f6f4e,
-  lidSandwichBottomLayout: 0x2f6f4e,
+  lidUpper: 0x6bcb77,
+  lidLower: 0x2f6f4e,
+  other: 0x5ea8d8,
 };
 
-const ASSEMBLY_COLORS = [0xd97757, 0x6bcb77, 0x2f6f4e, 0x6bcb77, 0x2f6f4e];
+function hexColor(value: unknown, fallback: number) {
+  const m = String(value ?? "")
+    .trim()
+    .match(/^#?([0-9a-fA-F]{6})$/);
+  return m ? parseInt(m[1], 16) : fallback;
+}
 
-function colorFor(part: string, index: number, count: number) {
-  if (count > 1) return ASSEMBLY_COLORS[index] ?? 0x5ea8d8;
-  return PART_COLORS[part] ?? 0xd97757;
+function partColors(vars: Vars = {}) {
+  const box = hexColor(vars.color_box, FALLBACK.box);
+  const lidUpper = hexColor(vars.color_lid_upper, FALLBACK.lidUpper);
+  const lidLower = hexColor(vars.color_lid_lower, FALLBACK.lidLower);
+  return { box, lidUpper, lidLower };
+}
+
+function colorFor(part: string, index: number, count: number, vars: Vars = {}) {
+  const c = partColors(vars);
+  if (count > 1) {
+    const seq = [c.box, c.lidUpper, c.lidLower, c.lidUpper, c.lidLower];
+    return seq[index] ?? FALLBACK.other;
+  }
+  if (part.startsWith("lidSandwichTop")) return c.lidUpper;
+  if (part.startsWith("lidSandwichBottom")) return c.lidLower;
+  return c.box;
 }
 
 export function Viewer({
   stl,
   parts,
   part = "assembly",
+  vars,
 }: {
   stl: ArrayBuffer | null;
   parts?: ArrayBuffer[] | null;
   part?: string;
+  vars?: Vars;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
@@ -115,7 +133,7 @@ export function Viewer({
     for (const [i, g] of geoms.entries()) {
       g.translate(ox, oy, oz);
       const mat = new THREE.MeshStandardMaterial({
-        color: colorFor(part, i, geoms.length),
+        color: colorFor(part, i, geoms.length, vars),
         metalness: 0.05,
         roughness: 0.45,
       });
@@ -141,7 +159,7 @@ export function Viewer({
     rec.camera.position.set(span * 1.4, height * 0.55 + span * 0.7, span * 1.5);
     rec.controls.target.set(0, height / 2, 0);
     rec.controls.update();
-  }, [stl, parts, part]);
+  }, [stl, parts, part, vars]);
 
   return <div className="viewer" ref={host} />;
 }
