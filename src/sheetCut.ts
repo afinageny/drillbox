@@ -54,12 +54,14 @@ export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
     depth / 2 - 0.4,
     height / 2 - 0.4
   );
+  const edge = String(vars.edge ?? params.find((p) => p.name === "edge")?.initial ?? "round");
+  const edgeS = edge === "chamfer" ? filletR / Math.SQRT2 : filletR;
   const lidH = Math.min(lidThickness > 0 ? lidThickness : wall / 2, (height - wall - 1) / 2);
   const flare = Math.min(lidH * Math.tan((angle * Math.PI) / 180), wall - 0.8);
   const yTop = depth / 2 - wall;
   const yBot = yTop + flare;
   const lidC = Math.min(clearance, flare / 3, lidH / 4);
-  const stopKeep = Math.max(0.8, wall - filletR);
+  const stopKeep = Math.max(0.8, wall - edgeS);
   const lidLen = width - stopKeep;
   const yt = yTop - lidC;
   const yb = yBot - lidC;

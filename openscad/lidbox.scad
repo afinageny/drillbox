@@ -14,7 +14,9 @@ depth = 50; // [20:1:200]
 height = 40; // [15:1:200]
 // Толщина стенок, мм
 thickness = 3; // [1.5:0.5:12]
-// Радиус скругления снаружи, мм
+// Стиль наружных граней
+edge = "round"; // [скругление:round, фаска 45°:chamfer]
+// Радиус скругления или длина фаски 45°, мм
 fillet_radius = 1.5; // [0:0.1:6]
 
 /* [Lid] */
@@ -60,12 +62,14 @@ function fillet_r() =
         height / 2 - 0.4
     );
 function lid_h() = min(lid_thickness > 0 ? lid_thickness : wall() / 2, (height - wall() - 1) / 2);
-function end_fillet_r() = fillet_r();
+function use_chamfer() = edge == "chamfer";
+function edge_s() = use_chamfer() ? fillet_r() / sqrt(2) : fillet_r();
+function end_fillet_r() = edge_s();
 function flare() = min(lid_h() * tan(dovetail_angle), wall() - 0.8);
 function y_top() = depth / 2 - wall();
 function y_bot() = y_top() + flare();
 function lid_c() = min(clearance, flare() / 3, lid_h() / 4);
-function stop_keep() = max(0.8, wall() - fillet_r());
+function stop_keep() = max(0.8, wall() - edge_s());
 function lid_len() = width - stop_keep();
 function yt() = y_top() - lid_c();
 function yb() = y_bot() - lid_c();
@@ -80,11 +84,19 @@ function win_wy() = max(1, (2 * yt() - (win_ny() + 1) * frame_width) / win_ny())
 function win_cx(i) = frame_x0() + win_wx() / 2 + i * (win_wx() + frame_width);
 function win_cy(j) = -yt() + frame_width + win_wy() / 2 + j * (win_wy() + frame_width);
 function pocket_d() = min(sheet_thickness / 2 + 0.15, lid_h() - 0.8);
+function window_rim_s() =
+    min(
+        edge_s(),
+        frame_width / 2 - 0.25,
+        win_wx() / 2 - 0.3,
+        win_wy() / 2 - 0.3,
+        lid_h() - pocket_d() - 0.3
+    );
 function pocket_wx() = win_wx() + 2 * window_lip;
 function pocket_wy() = min(win_wy() + 2 * window_lip, 2 * yb() - 2);
 function peg_h() = min(lid_h() / 2, lid_h() - 0.8);
 function peg_m() = min(
-    max(1.5, fillet_r() + peg_diameter / 2 + 0.4),
+    max(1.5, edge_s() + peg_diameter / 2 + 0.4),
     frame_width * 0.45,
     yt() - 1.2
 );
@@ -149,25 +161,95 @@ module rounded_cavity(size, r) {
     }
 }
 
+module chamfer_rect(w, d, c) {
+    cc = min(c, w / 2 - 0.05, d / 2 - 0.05);
+    if (cc < 0.05)
+        square([w, d]);
+    else
+        polygon([
+            [cc, 0],
+            [w - cc, 0],
+            [w, cc],
+            [w, d - cc],
+            [w - cc, d],
+            [cc, d],
+            [0, d - cc],
+            [0, cc]
+        ]);
+}
+
+module chamfered_cube(size, c) {
+    cc = min(c, size[0] / 2 - 0.05, size[1] / 2 - 0.05, size[2] / 2 - 0.05);
+    if (cc < 0.05) {
+        cube(size);
+    } else {
+        tw = size[0] - 2 * cc;
+        td = size[1] - 2 * cc;
+        tc = min(cc, tw / 2 - 0.05, td / 2 - 0.05);
+        hull() {
+            linear_extrude(max(0.02, size[2] - cc))
+                chamfer_rect(size[0], size[1], cc);
+            translate([cc, cc, size[2] - 0.02])
+                linear_extrude(0.02)
+                    chamfer_rect(tw, td, tc);
+        }
+    }
+}
+
+module chamfered_cavity(size, c) {
+    cc = min(c, size[0] / 2 - 0.05, size[1] / 2 - 0.05);
+    if (cc < 0.05)
+        cube(size);
+    else
+        linear_extrude(size[2])
+            chamfer_rect(size[0], size[1], cc);
+}
+
+module box_outer(size, s) {
+    if (use_chamfer())
+        chamfered_cube(size, s);
+    else
+        rounded_cube(size, s);
+}
+
+module box_cavity(size, s) {
+    if (use_chamfer())
+        chamfered_cavity(size, s);
+    else
+        rounded_cavity(size, s);
+}
+
+module wedge_xz(pts, hy) {
+    translate([0, hy, 0])
+        rotate([90, 0, 0])
+            linear_extrude(2 * hy)
+                polygon(pts);
+}
+
 module lid_end_fillets(len, hy, h) {
-    r = end_fillet_r();
-    if (r > 0.2) {
-        translate([0, -hy, h - r])
-            difference() {
-                translate([-0.05, 0, 0])
-                    cube([r + 0.05, 2 * hy, r + 0.05]);
-                translate([r, -0.1, 0])
-                    rotate([-90, 0, 0])
-                        cylinder(h = 2 * hy + 0.2, r = r);
-            }
-        translate([len, -hy, h - r])
-            difference() {
-                translate([-r, 0, 0])
-                    cube([r + 0.05, 2 * hy, r + 0.05]);
-                translate([-r, -0.1, 0])
-                    rotate([-90, 0, 0])
-                        cylinder(h = 2 * hy + 0.2, r = r);
-            }
+    s = end_fillet_r();
+    if (s > 0.2) {
+        if (use_chamfer()) {
+            wedge_xz([[0, h], [s, h], [0, h - s]], hy);
+            wedge_xz([[len, h], [len - s, h], [len, h - s]], hy);
+        } else {
+            translate([0, -hy, h - s])
+                difference() {
+                    translate([-0.05, 0, 0])
+                        cube([s + 0.05, 2 * hy, s + 0.05]);
+                    translate([s, -0.1, 0])
+                        rotate([-90, 0, 0])
+                            cylinder(h = 2 * hy + 0.2, r = s);
+                }
+            translate([len, -hy, h - s])
+                difference() {
+                    translate([-s, 0, 0])
+                        cube([s + 0.05, 2 * hy, s + 0.05]);
+                    translate([-s, -0.1, 0])
+                        rotate([-90, 0, 0])
+                            cylinder(h = 2 * hy + 0.2, r = s);
+                }
+        }
     }
 }
 
@@ -189,25 +271,42 @@ module lid_cavity() {
 }
 
 module limiter_follow_lid() {
-    r = end_fillet_r();
-    if (r > 0.2) {
+    s = end_fillet_r();
+    if (s > 0.2) {
         g = lid_c();
         hy = y_bot() + 1;
-        translate([-width / 2 + lid_len() - r, -hy, height - r])
-            intersection() {
-                translate([r - 0.02, 0, 0])
-                    cube([r + g + 0.4, 2 * hy, r + 0.2]);
-                rotate([-90, 0, 0])
-                    cylinder(h = 2 * hy, r = r + g);
-            }
+        if (use_chamfer()) {
+            translate([-width / 2 + lid_len() - s, 0, height - s])
+                intersection() {
+                    translate([s - 0.02, -hy, 0])
+                        cube([g + 0.4, 2 * hy, s + 0.2]);
+                    translate([0, hy, 0])
+                        rotate([90, 0, 0])
+                            linear_extrude(2 * hy)
+                                polygon([
+                                    [s + g, 0],
+                                    [0, s + g],
+                                    [-(s + g), 0],
+                                    [0, -(s + g)]
+                                ]);
+                }
+        } else {
+            translate([-width / 2 + lid_len() - s, -hy, height - s])
+                intersection() {
+                    translate([s - 0.02, 0, 0])
+                        cube([s + g + 0.4, 2 * hy, s + 0.2]);
+                    rotate([-90, 0, 0])
+                        cylinder(h = 2 * hy, r = s + g);
+                }
+        }
     }
 }
 
 module box_lid_groove() {
-    r = fillet_r();
+    s = edge_s();
     translate([-width / 2, 0, height - stack_h()]) {
         lid_cavity();
-        translate([-r - 0.4, 0, 0])
+        translate([-s - 0.4, 0, 0])
             lid_cavity();
     }
     limiter_follow_lid();
@@ -215,14 +314,14 @@ module box_lid_groove() {
 
 module box_body() {
     t = wall();
-    r = fillet_r();
+    s = edge_s();
     difference() {
         translate([-width / 2, -depth / 2, 0])
-            rounded_cube([width, depth, height], r);
+            box_outer([width, depth, height], s);
         translate([-width / 2 + t, -depth / 2 + t, t])
-            rounded_cavity(
+            box_cavity(
                 [width - 2 * t, depth - 2 * t, height - stack_h() - t + 0.02],
-                r
+                s
             );
         box_lid_groove();
     }
@@ -236,6 +335,83 @@ module window_through() {
     for (i = [0 : win_nx() - 1], j = [0 : win_ny() - 1])
         translate([win_cx(i), win_cy(j), lid_h() / 2])
             cube([win_wx(), win_wy(), lid_h() + 2], center = true);
+}
+
+module inner_edge_fillet(len, r) {
+    difference() {
+        cube([r, len, r]);
+        translate([r, -0.1, 0])
+            rotate([-90, 0, 0])
+                cylinder(h = len + 0.2, r = r, $fn = 64);
+    }
+}
+
+module rim_corner_miter(s) {
+    intersection() {
+        inner_edge_fillet(s, s);
+        linear_extrude(s + 0.05)
+            polygon([[-0.05, -0.05], [2 * s, -0.05], [2 * s, 2 * s]]);
+    }
+    intersection() {
+        translate([s, 0, 0])
+            rotate([0, 0, 90])
+                inner_edge_fillet(s, s);
+        linear_extrude(s + 0.05)
+            polygon([[-0.05, -0.05], [-0.05, 2 * s], [2 * s, 2 * s]]);
+    }
+}
+
+module window_rim_round(wx, wy, s, h) {
+    x0 = -wx / 2;
+    x1 = wx / 2;
+    y0 = -wy / 2;
+    y1 = wy / 2;
+    z = h - s;
+    translate([x1, y0, z])
+        inner_edge_fillet(wy, s);
+    translate([x0, y1, z])
+        rotate([0, 0, 180])
+            inner_edge_fillet(wy, s);
+    translate([x1, y1, z])
+        rotate([0, 0, 90])
+            inner_edge_fillet(wx, s);
+    translate([x0, y0, z])
+        rotate([0, 0, -90])
+            inner_edge_fillet(wx, s);
+    translate([x1, y1, z])
+        rim_corner_miter(s);
+    translate([x1, y0, z])
+        mirror([0, 1, 0])
+            rim_corner_miter(s);
+    translate([x0, y1, z])
+        mirror([1, 0, 0])
+            rim_corner_miter(s);
+    translate([x0, y0, z])
+        rotate([0, 0, 180])
+            rim_corner_miter(s);
+}
+
+module window_rim_chamfer(wx, wy, s, h) {
+    hull() {
+        translate([0, 0, h - s])
+            linear_extrude(0.02)
+                square([wx, wy], center = true);
+        translate([0, 0, h - 0.02])
+            linear_extrude(0.02)
+                offset(delta = s)
+                    square([wx, wy], center = true);
+    }
+}
+
+module window_top_rim() {
+    s = window_rim_s();
+    if (s > 0.2)
+        for (i = [0 : win_nx() - 1], j = [0 : win_ny() - 1])
+            translate([win_cx(i), win_cy(j), 0])
+                if (use_chamfer())
+                    window_rim_chamfer(win_wx(), win_wy(), s, lid_h());
+                else
+                    window_rim_round(win_wx(), win_wy(), s, lid_h());
 }
 
 module window_pockets(from_bottom) {
@@ -277,6 +453,7 @@ module lid_upper() {
         }
         window_through();
         window_pockets(true);
+        window_top_rim();
         lid_top_end_fillets();
     }
 }
