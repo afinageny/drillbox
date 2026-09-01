@@ -73,6 +73,7 @@ html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(-
 .row { display: flex; gap: 8px; align-items: center; }
 .row input[type="number"] { width: 72px; }
 .row input[type="text"] { flex: 1; }
+.row input.num { width: 72px; flex: none; }
 .field input[type="color"] {
   width: 36px;
   height: 28px;

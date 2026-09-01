@@ -66,7 +66,8 @@ export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
   const nx = Math.max(1, Math.round(windowCountX));
   const ny = Math.max(1, Math.round(windowCountY));
   const frameX0 = frameWidth + wall;
-  const winWx = Math.max(1, (lidLen - frameX0 - nx * frameWidth) / nx);
+  const frameX1 = Math.max(frameWidth, frameWidth + wall - stopKeep);
+  const winWx = Math.max(1, (lidLen - frameX0 - frameX1 - (nx - 1) * frameWidth) / nx);
   const winWy = Math.max(1, (2 * yt - (ny + 1) * frameWidth) / ny);
 
   return {

@@ -443,6 +443,85 @@ function SheetCutInfo({
   );
 }
 
+function clampNumber(n: number, param: Param) {
+  let x = n;
+  if (param.min != null) x = Math.max(param.min, x);
+  if (param.max != null) x = Math.min(param.max, x);
+  return x;
+}
+
+function parseNumberDraft(raw: string) {
+  const t = raw.trim().replace(",", ".");
+  if (t === "" || t === "-" || t === "." || t === "-.") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+function NumberParamField({
+  param,
+  value,
+  onChange,
+}: {
+  param: Param;
+  value: string | number | boolean;
+  onChange: (name: string, value: string | number | boolean) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const n = Number(value);
+  const shown = Number.isFinite(n) ? n : 0;
+  const clamped =
+    param.min != null && param.max != null ? clampNumber(shown, param) : shown;
+  const text = draft ?? (Number.isFinite(n) ? String(n) : "");
+
+  function commit(raw: string) {
+    const parsed = parseNumberDraft(raw);
+    const next = parsed == null ? clamped : clampNumber(parsed, param);
+    onChange(param.name, next);
+    setDraft(null);
+  }
+
+  return (
+    <div className="row">
+      {param.min != null && param.max != null ? (
+        <input
+          type="range"
+          min={param.min}
+          max={param.max}
+          step={param.step ?? 1}
+          value={clamped}
+          onChange={(e) => {
+            setDraft(null);
+            onChange(param.name, Number(e.target.value));
+          }}
+        />
+      ) : null}
+      <input
+        className="num"
+        type="text"
+        inputMode="decimal"
+        value={text}
+        onFocus={() => setDraft(Number.isFinite(n) ? String(n) : "")}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setDraft(raw);
+          const parsed = parseNumberDraft(raw);
+          if (
+            parsed != null &&
+            (param.min == null || parsed >= param.min) &&
+            (param.max == null || parsed <= param.max)
+          ) {
+            onChange(param.name, parsed);
+          }
+        }}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+      />
+    </div>
+  );
+}
+
 function ParamField({
   param,
   value,
@@ -492,37 +571,13 @@ function ParamField({
     );
   }
   if (param.type === "number") {
-    const n = Number(value);
-    const shown =
-      param.min != null && param.max != null
-        ? Math.min(param.max, Math.max(param.min, n))
-        : n;
     return (
       <div className="field">
         <label>
           {label}
           {param.caption ? <span className="name">{param.name}</span> : null}
         </label>
-        <div className="row">
-          {param.min != null && param.max != null ? (
-            <input
-              type="range"
-              min={param.min}
-              max={param.max}
-              step={param.step ?? 1}
-              value={shown}
-              onChange={(e) => onChange(param.name, Number(e.target.value))}
-            />
-          ) : null}
-          <input
-            type="number"
-            min={param.min}
-            max={param.max}
-            step={param.step ?? 1}
-            value={shown}
-            onChange={(e) => onChange(param.name, Number(e.target.value))}
-          />
-        </div>
+        <NumberParamField param={param} value={value} onChange={onChange} />
       </div>
     );
   }
