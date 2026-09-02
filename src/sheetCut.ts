@@ -38,7 +38,7 @@ export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
   const thickness = num(vars, params, "thickness", 3);
   const lidThickness = num(vars, params, "lid_thickness", 0);
   const angle = num(vars, params, "dovetail_angle", 20);
-  const clearance = num(vars, params, "clearance", 0.3);
+  const clearance = num(vars, params, "clearance", 0.1);
   const windowCountX = num(vars, params, "window_count_x", 2);
   const windowCountY = num(vars, params, "window_count_y", 1);
   const frameWidth = num(vars, params, "frame_width", 5);
@@ -60,12 +60,12 @@ export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
   const yBot = yTop + flare;
   const lidC = Math.min(clearance, flare / 3, lidH / 4);
   const stopKeep = Math.max(0.8, wall - filletR);
-  const lidLen = width - stopKeep;
+  const lidLen = width - stopKeep - lidC;
   const yt = yTop - lidC;
   const yb = yBot - lidC;
   const nx = Math.max(1, Math.round(windowCountX));
   const ny = Math.max(1, Math.round(windowCountY));
-  const frameX0 = frameWidth + wall;
+  const frameX0 = frameWidth + wall - lidC;
   const frameX1 = Math.max(frameWidth, frameWidth + wall - stopKeep);
   const winWx = Math.max(1, (lidLen - frameX0 - frameX1 - (nx - 1) * frameWidth) / nx);
   const winWy = Math.max(1, (2 * yt - (ny + 1) * frameWidth) / ny);

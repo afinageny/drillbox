@@ -23,7 +23,7 @@ lid_thickness = 0; // [0:0.5:8]
 // Угол трапеции, °
 dovetail_angle = 20; // [8:1:35]
 // Зазор крышки, мм
-clearance = 0.3; // [0.1:0.05:0.8]
+clearance = 0.1; // [0.1:0.05:0.8]
 // Диаметр чопиков, мм
 peg_diameter = 1.6; // [1.2:0.1:2.4]
 
@@ -66,7 +66,8 @@ function y_top() = depth / 2 - wall();
 function y_bot() = y_top() + flare();
 function lid_c() = min(clearance, flare() / 3, lid_h() / 4);
 function stop_keep() = max(0.8, wall() - fillet_r());
-function lid_len() = width - stop_keep();
+function lid_len() = width - stop_keep() - lid_c();
+function groove_len() = width - stop_keep();
 function yt() = y_top() - lid_c();
 function yb() = y_bot() - lid_c();
 function lid_travel() = lid_len();
@@ -74,7 +75,7 @@ function stack_h() = 2 * lid_h();
 
 function win_nx() = max(1, round(window_count_x));
 function win_ny() = max(1, round(window_count_y));
-function frame_x0() = frame_width + wall();
+function frame_x0() = frame_width + wall() - lid_c();
 function frame_x1() = max(frame_width, frame_width + wall() - stop_keep());
 function win_wx() = max(1, (lid_len() - frame_x0() - frame_x1() - (win_nx() - 1) * frame_width) / win_nx());
 function win_wy() = max(1, (2 * yt() - (win_ny() + 1) * frame_width) / win_ny());
@@ -186,7 +187,7 @@ module lid_frame(len, y_narrow, y_wide, h) {
 
 module lid_cavity() {
     translate([0, 0, -0.04])
-        lid_frame(lid_len(), y_top(), y_bot(), lid_h() + 0.08);
+        lid_frame(groove_len(), y_top(), y_bot(), lid_h() + 0.08);
 }
 
 module limiter_follow_lid() {
@@ -194,7 +195,7 @@ module limiter_follow_lid() {
     if (r > 0.2) {
         g = lid_c();
         hy = y_bot() + 1;
-        translate([-width / 2 + lid_len() - r, -hy, height - r])
+        translate([-width / 2 + groove_len() - r, -hy, height - r])
             intersection() {
                 translate([r - 0.02, 0, 0])
                     cube([r + g + 0.4, 2 * hy, r + 0.2]);
@@ -297,7 +298,7 @@ module lid_print() {
 
 module place_lid(z) {
     translate([-lid_open / 100 * lid_travel(), 0, 0])
-        translate([-width / 2, 0, z])
+        translate([-width / 2 + lid_c(), 0, z])
             children();
 }
 
