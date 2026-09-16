@@ -5,7 +5,8 @@
   "scripts": {
     "postinstall": "node scripts/fetch-wasm.mjs",
     "dev": "node scripts/vite.mjs",
-    "build": "node scripts/vite.mjs build",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && node scripts/vite.mjs build",
     "preview": "node scripts/vite.mjs preview"
   },
   "dependencies": {

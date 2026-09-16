@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { name as initialName, source as initialScad } from "virtual:scad";
 import { files as scadCatalog, defaultName as catalogDefault } from "virtual:scad-catalog";
@@ -29,6 +29,15 @@ type Job = {
 
 type Theme = "light" | "dark";
 const THEME_KEY = "drillbox-theme";
+const EDITOR_WIDTH_KEY = "drillbox-editor-ratio";
+
+function readEditorRatio() {
+  try {
+    const value = Number(localStorage.getItem(EDITOR_WIDTH_KEY));
+    if (Number.isFinite(value) && value > 0 && value < 1) return value;
+  } catch { /* Storage may be unavailable. */ }
+  return 1 / 2.3;
+}
 
 function readTheme(): Theme {
   try {
@@ -100,6 +109,21 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [diags, setDiags] = useState<Diag[]>([]);
   const [theme, setTheme] = useState<Theme>(readTheme);
+  const [editorRatio, setEditorRatio] = useState(readEditorRatio);
+  const [resizing, setResizing] = useState(false);
+  const workRef = useRef<HTMLDivElement>(null);
+  const dragOffset = useRef(0);
+
+  useEffect(() => {
+    try { localStorage.setItem(EDITOR_WIDTH_KEY, String(editorRatio)); }
+    catch { /* Resizing still works without storage. */ }
+  }, [editorRatio]);
+
+  function resizeEditor(width: number) {
+    const available = (workRef.current?.clientWidth ?? 0) - 306;
+    if (available < 600) return;
+    setEditorRatio(Math.max(280, Math.min(available - 320, width)) / available);
+  }
   const job = useRef<Job & { worker?: Worker }>({ id: 0, preview: true });
   const debounce = useRef<number>(0);
   const urlDebounce = useRef<number>(0);
@@ -194,7 +218,7 @@ export function App() {
     const monaco = monacoRef.current;
     const ed = editorRef.current;
     const model = ed?.getModel();
-    if (!monaco || !model) return;
+    if (!monaco || !ed || !model) return;
     const here = diags.filter((d) => sameFile(d.file, openPath));
     const count = model.getLineCount();
     monaco.editor.setModelMarkers(
@@ -375,8 +399,12 @@ export function App() {
         </button>
         <span className={`status ${err ? "err" : "ok"}`}>{status}</span>
       </header>
-      <div className="work">
-        <div className="editor">
+      <div
+        ref={workRef}
+        className={`work${resizing ? " resizing" : ""}`}
+        style={{ "--editor-share": `${editorRatio}fr`, "--viewer-share": `${1 - editorRatio}fr` } as CSSProperties}
+      >
+        <div className="editor" id="code-editor-pane">
           <div className="editor-pane">
             <Editor
               language="cpp"
@@ -418,6 +446,39 @@ export function App() {
             </button>
           ) : null}
         </div>
+        <div
+          className="editor-resizer"
+          role="separator"
+          aria-label="Resize code editor"
+          aria-orientation="vertical"
+          aria-controls="code-editor-pane"
+          aria-valuenow={Math.round(editorRatio * 100)}
+          tabIndex={0}
+          title="Drag to resize code editor"
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            dragOffset.current = e.clientX - e.currentTarget.getBoundingClientRect().left;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setResizing(true);
+          }}
+          onPointerMove={(e) => {
+            if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+            resizeEditor(e.clientX - (workRef.current?.getBoundingClientRect().left ?? 0) - dragOffset.current);
+          }}
+          onPointerUp={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+            setResizing(false);
+          }}
+          onPointerCancel={() => setResizing(false)}
+          onLostPointerCapture={() => setResizing(false)}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            e.preventDefault();
+            const width = workRef.current?.firstElementChild?.getBoundingClientRect().width ?? 280;
+            resizeEditor(width + (e.key === "ArrowRight" ? 20 : -20));
+          }}
+        />
         <div className="stage">
           <Viewer stl={stl} parts={parts} part={part} vars={previewVars} theme={theme} />
         </div>
@@ -449,7 +510,10 @@ export function App() {
 }
 
 function boundParam(param: Param, vars: Vars, params: Param[]): Param {
-  if (param.name !== "fillet_radius") return param;
+  if (param.name === "thickness" && params.some((p) => p.name === "lid_half_thickness")) {
+    return { ...param, min: 0.1, step: 0.1, recommendedMin: 2.4 };
+  }
+  if (param.name !== "fillet_radius" && param.name !== "divider_height") return param;
   const n = (name: string, fallback: number) => {
     const p = params.find((x) => x.name === name);
     const v = vars[name] ?? p?.initial ?? fallback;
@@ -457,25 +521,32 @@ function boundParam(param: Param, vars: Vars, params: Param[]): Param {
   };
   const wall = Math.min(
     n("thickness", 3),
-    n("width", 80) / 2 - 0.8,
-    n("depth", 50) / 2 - 0.8,
+    n("length", 80) / 2 - 0.8,
+    n("width", 50) / 2 - 0.8,
     n("height", 40) - 1
   );
+  if (param.name === "divider_height") {
+    const height = n("height", 40);
+    const half = n("lid_half_thickness", 0);
+    const lidH = Math.min(half > 0 ? half : wall / 2, (height - wall - 1) / 2);
+    const max = Math.max(0, height - 2 * lidH - wall - Math.max(0.2, n("divider_lid_gap", 1)));
+    return { ...param, min: 0, max, step: 0.1 };
+  }
   return { ...param, min: 0, max: Math.max(0, wall / 2), step: 0.1 };
 }
 
 function SheetCutInfo({
   sheet,
 }: {
-  sheet: { count: number; width: number; depth: number; thickness: number };
+  sheet: { count: number; length: number; width: number; thickness: number };
 }) {
   return (
     <div className="sheet-cut">
       <div className="sheet-cut-count">{sheet.count} window{sheet.count === 1 ? "" : "s"}</div>
       <div className="sheet-cut-size">
-        {formatMm(sheet.width)} × {formatMm(sheet.depth)} × {formatMm(sheet.thickness)} mm
+        {formatMm(sheet.length)} × {formatMm(sheet.width)} × {formatMm(sheet.thickness)} mm
       </div>
-      <div className="sheet-cut-hint">width × depth × thickness, into the window pocket</div>
+      <div className="sheet-cut-hint">length × width × thickness, into the window pocket</div>
     </div>
   );
 }
@@ -509,6 +580,10 @@ function NumberParamField({
   const clamped =
     param.min != null && param.max != null ? clampNumber(shown, param) : shown;
   const text = draft ?? (Number.isFinite(n) ? String(n) : "");
+  const entered = parseNumberDraft(text);
+  const warning = entered != null && param.recommendedMin != null && entered < param.recommendedMin
+    ? `Below the recommended minimum: wall thickness for 3D printing should be at least ${param.recommendedMin} mm.`
+    : undefined;
 
   function commit(raw: string) {
     const parsed = parseNumberDraft(raw);
@@ -533,7 +608,10 @@ function NumberParamField({
         />
       ) : null}
       <input
-        className="num"
+        className={`num${warning ? " warning" : ""}`}
+        title={warning}
+        aria-label={param.caption || param.name}
+        aria-description={warning}
         type="text"
         inputMode="decimal"
         value={text}

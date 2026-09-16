@@ -7,12 +7,12 @@ function num(vars: Vars, params: Param[], name: string, fallback: number) {
 }
 
 const NEEDED = [
+  "length",
   "width",
-  "depth",
   "height",
   "thickness",
   "fillet_radius",
-  "lid_thickness",
+  "lid_half_thickness",
   "dovetail_angle",
   "clearance",
   "window_count_x",
@@ -24,19 +24,19 @@ const NEEDED = [
 
 export type SheetCut = {
   count: number;
+  length: number;
   width: number;
-  depth: number;
   thickness: number;
 };
 
 export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
   if (!NEEDED.every((name) => params.some((p) => p.name === name))) return null;
 
-  const width = num(vars, params, "width", 80);
-  const depth = num(vars, params, "depth", 50);
+  const length = num(vars, params, "length", 80);
+  const width = num(vars, params, "width", 50);
   const height = num(vars, params, "height", 40);
   const thickness = num(vars, params, "thickness", 3);
-  const lidThickness = num(vars, params, "lid_thickness", 0);
+  const lidHalfThickness = num(vars, params, "lid_half_thickness", 0);
   const angle = num(vars, params, "dovetail_angle", 20);
   const clearance = num(vars, params, "clearance", 0.1);
   const windowCountX = num(vars, params, "window_count_x", 2);
@@ -46,21 +46,21 @@ export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
   const sheetThickness = num(vars, params, "sheet_thickness", 1);
 
   const filletRadius = num(vars, params, "fillet_radius", 1.5);
-  const wall = Math.min(thickness, width / 2 - 0.8, depth / 2 - 0.8, height - 1);
+  const wall = Math.min(thickness, length / 2 - 0.8, width / 2 - 0.8, height - 1);
   const filletR = Math.min(
     Math.max(0, filletRadius),
     wall / 2,
+    length / 2 - 0.4,
     width / 2 - 0.4,
-    depth / 2 - 0.4,
     height / 2 - 0.4
   );
-  const lidH = Math.min(lidThickness > 0 ? lidThickness : wall / 2, (height - wall - 1) / 2);
+  const lidH = Math.min(lidHalfThickness > 0 ? lidHalfThickness : wall / 2, (height - wall - 1) / 2);
   const flare = Math.min(lidH * Math.tan((angle * Math.PI) / 180), wall - 0.8);
-  const yTop = depth / 2 - wall;
+  const yTop = width / 2 - wall;
   const yBot = yTop + flare;
   const lidC = Math.min(clearance, flare / 3, lidH / 4);
   const stopKeep = Math.max(0.8, wall - filletR);
-  const lidLen = width - stopKeep - lidC;
+  const lidLen = length - stopKeep - lidC;
   const yt = yTop - lidC;
   const yb = yBot - lidC;
   const nx = Math.max(1, Math.round(windowCountX));
@@ -72,8 +72,8 @@ export function sheetCutList(vars: Vars, params: Param[]): SheetCut | null {
 
   return {
     count: nx * ny,
-    width: winWx + 2 * windowLip,
-    depth: Math.min(winWy + 2 * windowLip, 2 * yb - 2),
+    length: winWx + 2 * windowLip,
+    width: Math.min(winWy + 2 * windowLip, 2 * yb - 2),
     thickness: sheetThickness,
   };
 }

@@ -14,6 +14,7 @@ export type Param = {
   min?: number;
   max?: number;
   step?: number;
+  recommendedMin?: number;
 };
 
 export function parseLiteral(raw: string): { type: ParamType; value: string | number | boolean } {

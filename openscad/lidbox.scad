@@ -6,10 +6,10 @@ part = "print"; // [print:print, assembly:assembly, box:box, lid upper:lidSandwi
 lid_open = 0; // [0:1:100]
 
 /* [Box] */
-// Width (slide direction), mm
-width = 80; // [20:1:200]
-// Depth, mm
-depth = 50; // [20:1:200]
+// Length (slide direction), mm
+length = 80; // [20:1:200]
+// Width, mm
+width = 50; // [20:1:200]
 // Height, mm
 height = 40; // [15:1:200]
 // Thickness, mm
@@ -18,8 +18,8 @@ thickness = 3; // [1.5:0.5:12]
 fillet_radius = 1.5; // [0:0.1:6]
 
 /* [Lid] */
-// Lid thickness, mm (0 = half wall thickness)
-lid_thickness = 0; // [0:0.5:8]
+// Lid half thickness, mm (0 = half wall thickness)
+lid_half_thickness = 0; // [0:0.5:8]
 // Dovetail angle, °
 dovetail_angle = 20; // [8:1:35]
 // Clearance, mm
@@ -39,6 +39,18 @@ window_lip = 2; // [1:0.5:5]
 // Sheet thickness, mm
 sheet_thickness = 1; // [0.3:0.1:1]
 
+/* [Dividers] */
+// Divider count X (walls perpendicular to X)
+divider_count_x = 0; // [0:1:12]
+// Divider count Y (walls perpendicular to Y)
+divider_count_y = 0; // [0:1:12]
+// Divider height, mm (0 = maximum below closed lid)
+divider_height = 0; // [0:0.5:200]
+// Divider thickness, mm (0 = half box wall thickness)
+divider_thickness = 0; // [0:0.1:12]
+// Safety gap below closed lid, mm (minimum 0.2)
+divider_lid_gap = 1; // [0.2:0.1:10]
+
 /* [Colors] */
 // Color box
 color_box = "#d97757";
@@ -50,28 +62,38 @@ color_lid_lower = "#2f6f4e";
 $fa = $preview ? 8 : 5;
 $fs = $preview ? 0.8 : 0.4;
 
-function wall() = min(thickness, width / 2 - 0.8, depth / 2 - 0.8, height - 1);
+function wall() = min(thickness, length / 2 - 0.8, width / 2 - 0.8, height - 1);
 function fillet_r() =
     min(
         max(0, fillet_radius),
         wall() / 2,
+        length / 2 - 0.4,
         width / 2 - 0.4,
-        depth / 2 - 0.4,
         height / 2 - 0.4
     );
-function lid_h() = min(lid_thickness > 0 ? lid_thickness : wall() / 2, (height - wall() - 1) / 2);
+function lid_h() = min(lid_half_thickness > 0 ? lid_half_thickness : wall() / 2, (height - wall() - 1) / 2);
 function end_fillet_r() = fillet_r();
 function flare() = min(lid_h() * tan(dovetail_angle), wall() - 0.8);
-function y_top() = depth / 2 - wall();
+function y_top() = width / 2 - wall();
 function y_bot() = y_top() + flare();
 function lid_c() = min(clearance, flare() / 3, lid_h() / 4);
 function stop_keep() = max(0.8, wall() - fillet_r());
-function lid_len() = width - stop_keep() - lid_c();
-function groove_len() = width - stop_keep();
+function lid_len() = length - stop_keep() - lid_c();
+function groove_len() = length - stop_keep();
 function yt() = y_top() - lid_c();
 function yb() = y_bot() - lid_c();
 function lid_travel() = lid_len();
 function stack_h() = 2 * lid_h();
+
+function div_nx() = max(0, round(divider_count_x));
+function div_ny() = max(0, round(divider_count_y));
+function div_t() = divider_thickness > 0 ? divider_thickness : wall() / 2;
+function div_h() =
+    let(limit = max(0, height - stack_h() - wall() - max(0.2, divider_lid_gap)))
+    divider_height == 0 ? limit : max(0, min(divider_height, limit));
+// Equal clear compartment widths, accounting for divider thickness.
+function div_pos(size, count, i) =
+    -size / 2 + i * (size - count * div_t()) / (count + 1) + (i - 0.5) * div_t();
 
 function win_nx() = max(1, round(window_count_x));
 function win_ny() = max(1, round(window_count_y));
@@ -195,7 +217,7 @@ module limiter_follow_lid() {
     if (r > 0.2) {
         g = lid_c();
         hy = y_bot() + 1;
-        translate([-width / 2 + groove_len() - r, -hy, height - r])
+        translate([-length / 2 + groove_len() - r, -hy, height - r])
             intersection() {
                 translate([r - 0.02, 0, 0])
                     cube([r + g + 0.4, 2 * hy, r + 0.2]);
@@ -207,7 +229,7 @@ module limiter_follow_lid() {
 
 module box_lid_groove() {
     r = fillet_r();
-    translate([-width / 2, 0, height - stack_h()]) {
+    translate([-length / 2, 0, height - stack_h()]) {
         lid_cavity();
         translate([-r - 0.4, 0, 0])
             lid_cavity();
@@ -215,18 +237,50 @@ module box_lid_groove() {
     limiter_follow_lid();
 }
 
-module box_body() {
+module box_shell() {
     t = wall();
     r = fillet_r();
     difference() {
-        translate([-width / 2, -depth / 2, 0])
-            rounded_cube([width, depth, height], r);
-        translate([-width / 2 + t, -depth / 2 + t, t])
+        translate([-length / 2, -width / 2, 0])
+            rounded_cube([length, width, height], r);
+        translate([-length / 2 + t, -width / 2 + t, t])
             rounded_cavity(
-                [width - 2 * t, depth - 2 * t, height - stack_h() - t + 0.02],
+                [length - 2 * t, width - 2 * t, height - stack_h() - t + 0.02],
                 r
             );
         box_lid_groove();
+    }
+}
+
+module box_dividers() {
+    t = wall();
+    iw = length - 2 * t;
+    id = width - 2 * t;
+    nx = div_nx();
+    ny = div_ny();
+    h = div_h();
+    dt = div_t();
+    if (h > 0 && (nx > 0 || ny > 0)) {
+        assert(nx == 0 || iw - nx * dt >= nx + 1,
+            "X dividers do not fit: reduce count or thickness, or increase length.");
+        assert(ny == 0 || id - ny * dt >= ny + 1,
+            "Y dividers do not fit: reduce count or thickness, or increase width.");
+        // Small overlaps join the dividers to the floor and side walls.
+        if (nx > 0)
+            for (i = [1 : nx])
+                translate([div_pos(iw, nx, i) - dt / 2, -id / 2 - 0.02, t - 0.02])
+                    cube([dt, id + 0.04, h + 0.02]);
+        if (ny > 0)
+            for (i = [1 : ny])
+                translate([-iw / 2 - 0.02, div_pos(id, ny, i) - dt / 2, t - 0.02])
+                    cube([iw + 0.04, dt, h + 0.02]);
+    }
+}
+
+module box_body() {
+    union() {
+        box_shell();
+        box_dividers();
     }
 }
 
@@ -298,12 +352,12 @@ module lid_print() {
 
 module place_lid(z) {
     translate([-lid_open / 100 * lid_travel(), 0, 0])
-        translate([-width / 2 + lid_c(), 0, z])
+        translate([-length / 2 + lid_c(), 0, z])
             children();
 }
 
 function layout_gap() = 12;
-function frame_x() = width / 2 + 16;
+function frame_x() = length / 2 + 16;
 function frame_pitch() = 2 * yb() + layout_gap();
 
 module lid_upper_layout() {

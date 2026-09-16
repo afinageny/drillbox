@@ -65,8 +65,11 @@ html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(-
 .work {
   flex: 1; min-height: 0;
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.3fr) 300px;
+  grid-template-columns: minmax(280px, var(--editor-share, 1fr)) 6px minmax(320px, var(--viewer-share, 1.3fr)) 300px;
 }
+.editor-resizer { cursor: col-resize; touch-action: none; background: var(--line); }
+.editor-resizer:hover, .editor-resizer:focus-visible, .resizing .editor-resizer { background: var(--accent); }
+.work.resizing, .work.resizing * { cursor: col-resize !important; user-select: none !important; }
 .work > * { min-width: 0; min-height: 0; }
 .editor { border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .editor-pane { flex: 1; min-height: 0; }
@@ -103,6 +106,11 @@ html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(-
 .row input[type="number"] { width: 72px; }
 .row input[type="text"] { flex: 1; }
 .row input.num { width: 72px; flex: none; }
+.field input.num.warning {
+  border-color: #f59e0b;
+  background: color-mix(in srgb, var(--input) 82%, #f59e0b);
+  outline: 1px solid #f59e0b;
+}
 .field input[type="color"] {
   width: 36px;
   height: 28px;
@@ -124,6 +132,7 @@ html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(-
 .sheet-cut-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
 @media (max-width: 960px) {
+  .editor-resizer { display: none; }
   .work { grid-template-columns: 1fr; grid-template-rows: 40vh 40vh auto; }
   .editor, .stage { border-right: 0; border-bottom: 1px solid var(--line); }
 }
