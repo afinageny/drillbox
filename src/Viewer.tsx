@@ -140,13 +140,14 @@ export function Viewer({
   useEffect(() => {
     const rec = ctx.current;
     const buffers = parts?.length ? parts : stl ? [stl] : [];
-    if (!rec || !buffers.length) return;
+    if (!rec) return;
     for (const mesh of rec.meshes) {
       rec.scene.remove(mesh);
       mesh.geometry.dispose();
       (mesh.material as THREE.Material).dispose();
     }
     rec.meshes = [];
+    if (!buffers.length) return;
 
     const loader = new STLLoader();
     const geoms = buffers.map((buf) => {
@@ -188,7 +189,8 @@ export function Viewer({
     const gridSize = Math.ceil((span * 2.4) / 20) * 20;
     rec.grid = new THREE.GridHelper(gridSize, 20, look.grid, look.gridMinor);
     rec.scene.add(rec.grid);
-    rec.camera.position.set(span * 1.4, height * 0.55 + span * 0.7, span * 1.5);
+    const viewSpan = Math.max(span, height) / Math.min(1, rec.camera.aspect);
+    rec.camera.position.set(viewSpan * 1.4, height * 0.55 + viewSpan * 0.7, viewSpan * 1.5);
     rec.controls.target.set(0, height / 2, 0);
     rec.controls.update();
   }, [stl, parts, part, vars]);

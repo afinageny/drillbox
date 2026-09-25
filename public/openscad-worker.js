@@ -109,7 +109,16 @@ self.onmessage = async (event) => {
     const inputMain = hasFiles ? main : "input.scad";
     const part = vars && vars.part != null ? String(vars.part) : "print";
 
-    if (part === "assembly" || part === "print") {
+    // Only models declaring the sandwich-lid selectors support this split.
+    // Other SCAD models must receive their original part selection unchanged.
+    const mainSource = inputFiles[inputMain];
+    const sandwichSelectors = [
+      "box", "lidSandwichTopLayout", "lidSandwichBottomLayout",
+      "lidSandwichTopPlaced", "lidSandwichBottomPlaced",
+    ];
+    const hasSandwichParts = typeof mainSource === "string" &&
+      sandwichSelectors.every((name) => mainSource.includes(`"${name}"`));
+    if (hasSandwichParts && (part === "assembly" || part === "print")) {
       const names =
         part === "print"
           ? ["box", "lidSandwichTopLayout", "lidSandwichBottomLayout"]

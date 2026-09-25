@@ -30,6 +30,17 @@ type Job = {
 type Theme = "light" | "dark";
 const THEME_KEY = "drillbox-theme";
 const EDITOR_WIDTH_KEY = "drillbox-editor-ratio";
+const MODEL_KEY = "drillbox-selected-model";
+
+function savedModel() {
+  try { return localStorage.getItem(MODEL_KEY) ?? ""; }
+  catch { return ""; }
+}
+
+function rememberModel(name: string) {
+  try { localStorage.setItem(MODEL_KEY, name); }
+  catch { /* The URL still preserves the selection without storage. */ }
+}
 
 function readEditorRatio() {
   try {
@@ -65,6 +76,7 @@ function catalogNames() {
 function bootModel() {
   return (
     pickCatalogFile(scadCatalog, requestedCatalogFile()) ??
+    pickCatalogFile(scadCatalog, savedModel()) ??
     pickCatalogFile(scadCatalog, catalogDefault) ??
     pickCatalogFile(scadCatalog, initialName) ?? { name: initialName, source: initialScad }
   );
@@ -298,8 +310,10 @@ export function App() {
     skipUrlSync.current = true;
     window.clearTimeout(urlDebounce.current);
     const model =
-      pickCatalogFile(scadCatalog, catalogDefault) ??
-      pickCatalogFile(scadCatalog, initialName) ?? { name: initialName, source: initialScad };
+      pickCatalogFile(scadCatalog, main) ?? {
+        name: main,
+        source: main === boot.project.main ? fileText(boot.project.files, main) : mainSource,
+      };
     const fresh = defaultProject(model.source, model.name);
     setFiles(fresh.files);
     setMain(fresh.main);
@@ -307,8 +321,10 @@ export function App() {
     setVars({});
     setDiags([]);
     setErr(false);
-    setStatus("Default model");
+    setStatus("Model defaults restored");
     clearShareUrl();
+    rememberModel(model.name);
+    syncProjectUrl(fresh.files, fresh.main, {}, scadCatalog);
   }
 
   function loadCatalogModel(name: string) {
@@ -317,6 +333,8 @@ export function App() {
     skipUrlSync.current = true;
     window.clearTimeout(urlDebounce.current);
     const fresh = defaultProject(hit.source, hit.name);
+    setStl(null);
+    setParts(null);
     setFiles(fresh.files);
     setMain(fresh.main);
     setOpenPath(fresh.main);
@@ -324,6 +342,9 @@ export function App() {
     setDiags([]);
     setErr(false);
     setStatus(hit.name);
+    rememberModel(hit.name);
+    // Persist immediately: a reload must not race the debounced editor sync.
+    syncProjectUrl(fresh.files, fresh.main, {}, scadCatalog);
   }
 
   async function copyShareLink() {
@@ -387,7 +408,7 @@ export function App() {
         <button disabled={busy} onClick={copyShareLink}>
           Link
         </button>
-        <button disabled={busy} onClick={resetToDefault} title="Clear the model from the URL and show the built-in one">
+        <button disabled={busy} onClick={resetToDefault} title="Restore defaults for the selected model">
           Reset
         </button>
         <button
@@ -415,7 +436,18 @@ export function App() {
                 monacoRef.current = monaco;
               }}
               onChange={(v) => {
-                setFiles((prev) => ({ ...prev, [openPath]: encodeText(v ?? "") }));
+                const edited = v ?? "";
+                setFiles((prev) => ({ ...prev, [openPath]: encodeText(edited) }));
+                // Controls already write their values into the source. Keep
+                // command-line overrides in sync when the source is edited too.
+                if (openPath === main) {
+                  const values = new Map(parseCustomizer(edited).map((p) => [p.name, p.initial]));
+                  setVars((prev) => Object.fromEntries(
+                    Object.keys(prev)
+                      .filter((name) => values.has(name))
+                      .map((name) => [name, values.get(name)!])
+                  ));
+                }
               }}
               options={{
                 minimap: { enabled: false },
