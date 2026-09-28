@@ -42,6 +42,8 @@ cap_end_twist = 0; // [-90:5:90]
 cap_end_groove = 2; // [0:0.25:4]
 // Depth of the central concave dish, mm.
 cap_center_depth = 4; // [0:0.5:10]
+// Extra internal height for the shuttlecock head, mm.
+cap_headroom_height = 8; // [0:0.5:15]
 // Flat standing surface on each cap, diameter in mm.
 cap_stand_diameter = 56; // [20:1:75]
 
@@ -59,6 +61,9 @@ cap_r = neck_r + thread_depth + radial_clearance + cap_wall;
 cap_flat_h = neck_length + end_gap + cap_roof;
 cap_h = cap_flat_h + cap_round_height;
 stand_r = cap_stand_diameter / 2;
+// The head pocket begins at the full threaded-bore radius, eliminating the
+// flat shelf between the last thread and the domed roof.
+headroom_r = neck_r + radial_clearance;
 // Visual overlap used only for the assembled preview; printed parts remain
 // dimensioned by the screw thread and are not shortened.
 assembly_overlap = 0;
@@ -77,6 +82,10 @@ assert(cap_wall >= 1.2 && cap_roof >= 1.2 && end_gap > 0);
 assert(cap_round_height > 0);
 assert(cap_end_groove >= 0 && cap_end_groove < cap_round_height/2);
 assert(cap_center_depth >= 0 && cap_center_depth < cap_round_height);
+assert(cap_headroom_height >= 0);
+assert(cap_bore_h + cap_headroom_height + cap_roof
+       <= cap_flat_h - cap_center_depth + cap_headroom_height + cap_roof,
+       "The cap roof is too low above the thread cavity");
 assert(cap_stand_diameter > 0 && cap_stand_diameter < 2*body_r,
        "Standing diameter must be smaller than the cap valley diameter");
 assert(thread_pitch * 0.65 + 2 * axial_clearance < thread_pitch);
@@ -196,6 +205,9 @@ module cap_outer() {
                 // cap and again at the centre, producing a rounded blend.
                 z = cap_flat_h + cap_round_height*pow(sin(2*t), 2)
                     - cap_center_depth*pow(sin(t),2)
+                    // Lift only the central part of the recessed end.  This
+                    // leaves a standing rim while making room for the cork.
+                    + (cap_headroom_height + cap_roof)*pow(sin(t),8)
                     - cap_end_groove*(1-cos(wave_count*a))/2*pow(sin(2*t),2),
                 r = stand_r + (body_r - stand_r + wave_depth*(1+cos(wave_count*a))/2)*cos(t),
                 // Keep the ridge direction almost unchanged at the body
@@ -219,6 +231,12 @@ module cap() {
         cap_outer();
         translate([0, 0, -eps])
             cylinder(r = neck_r + radial_clearance, h = cap_bore_h + eps);
+        // Hemispherical pocket above the threaded bore.  Its top follows the
+        // raised centre of the outer shell and leaves cap_roof of material.
+        if (cap_headroom_height > 0)
+            translate([0, 0, cap_bore_h])
+                scale([headroom_r, headroom_r, cap_headroom_height])
+                    sphere(r = 1);
         thread_ridge(radial_clearance, axial_clearance);
         // Lead-in opening clears the first thread flank.
         translate([0, 0, -eps])
