@@ -88,7 +88,21 @@ html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(-
   overflow: auto;
 }
 .stage { display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--stage); }
-.viewer { flex: 1; min-height: 0; }
+.viewer { flex: 1; min-height: 0; position: relative; }
+.viewer-png {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  right: 10px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+.viewer-png:hover { border-color: var(--accent); }
 .params {
   overflow: auto; background: var(--panel); padding: 10px 12px 24px;
 }

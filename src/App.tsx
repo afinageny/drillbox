@@ -512,7 +512,14 @@ export function App() {
           }}
         />
         <div className="stage">
-          <Viewer stl={stl} parts={parts} part={part} vars={previewVars} theme={theme} />
+          <Viewer
+            stl={stl}
+            parts={parts}
+            part={part}
+            vars={previewVars}
+            theme={theme}
+            downloadName={`${title}-${part}`}
+          />
         </div>
         <aside className="params">
           {Object.entries(grouped).map(([group, list]) => (

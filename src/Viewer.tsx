@@ -63,12 +63,14 @@ export function Viewer({
   part = "assembly",
   vars,
   theme = "light",
+  downloadName = "model",
 }: {
   stl: ArrayBuffer | null;
   parts?: ArrayBuffer[] | null;
   part?: string;
   vars?: Vars;
   theme?: "light" | "dark";
+  downloadName?: string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
@@ -91,7 +93,7 @@ export function Viewer({
     scene.background = new THREE.Color(look.bg);
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
     camera.position.set(180, 140, 220);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     el.appendChild(renderer.domElement);
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -195,5 +197,25 @@ export function Viewer({
     rec.controls.update();
   }, [stl, parts, part, vars]);
 
-  return <div className="viewer" ref={host} />;
+  function exportPng() {
+    const rec = ctx.current;
+    if (!rec || !rec.meshes.length) return;
+    rec.renderer.render(rec.scene, rec.camera);
+    rec.renderer.domElement.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${downloadName || "model"}.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+  }
+
+  return (
+    <div className="viewer" ref={host}>
+      <button className="viewer-png" type="button" onClick={exportPng} title="Save the current view as PNG">
+        PNG
+      </button>
+    </div>
+  );
 }

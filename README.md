@@ -12,13 +12,15 @@ Direct links:
 - [Sliding-lid storage box](https://afinageny.github.io/drillbox/?file=lidbox.scad)
 - [Shuttlecock tube](https://afinageny.github.io/drillbox/?file=shuttlecock_tube.scad)
 
-Use **Preview** while adjusting parameters, **Render** for final geometry, and **STL** to export the currently selected part.
+Use **Preview** while adjusting parameters, **Render** for final geometry, **STL** to export the currently selected part, and **PNG** to save the current camera view.
 
 ## Models
 
 ### Drill plate and water cover
 
 File: [`openscad/drillbox.scad`](openscad/drillbox.scad)
+
+![Drill plate water cover preview](docs/images/drillbox-waterCover.png)
 
 A matched drilling template and raised water cover for one or more circular openings. The cover includes two G 1/2 threaded ports, with matching printable hose and drain fittings.
 
@@ -36,6 +38,8 @@ Main parameters control the hole count and spacing, plate margins and fillets, c
 
 File: [`openscad/lidbox.scad`](openscad/lidbox.scad)
 
+![Sliding-lid storage box preview](docs/images/lidbox-assembly.png)
+
 A rounded storage box with a two-piece sliding sandwich lid. The lid halves use matching trapezoidal profiles and alignment pegs, and can hold transparent sheet inserts in configurable window openings.
 
 Available parts:
@@ -51,6 +55,8 @@ Use `lid_open` to inspect the sliding action. The box size, wall thickness, lid 
 ### Shuttlecock tube
 
 File: [`openscad/shuttlecock_tube.scad`](openscad/shuttlecock_tube.scad)
+
+![Shuttlecock tube preview](docs/images/shuttlecock_tube-assembly.png)
 
 A protective tube for badminton shuttlecocks with identical screw caps at both ends. The default body is 210 mm long with a 70 mm clear bore. Spiral ribs continue smoothly from the body across the rounded caps, while each cap retains a flat standing area.
 
