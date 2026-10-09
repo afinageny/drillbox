@@ -134,6 +134,38 @@ self.onmessage = async (event) => {
       return;
     }
 
+    const normalizedMain = inputMain.replace(/\\/g, "/");
+    const hasTileCutter = /(?:^|\/)tile-cutter\.scad$/i.test(normalizedMain);
+    if (hasTileCutter && part === "assembly") {
+      const names = [
+        "guide", "trolley_placed", "bearings", "bolts", "nuts", "washers", "cutter_arm_placed",
+        "cutter_wheel_placed", "cutter_axle_placed"
+      ];
+      const parts = [];
+      for (const name of names) {
+        parts.push(
+          await compileStl(inputFiles, inputMain, { ...vars, part: name }, preview, logs)
+        );
+      }
+      const stl = mergeBinStl(parts);
+      self.postMessage({ id, ok: true, stl, parts, log: logs.join("\n") }, [stl, ...parts]);
+      return;
+    }
+
+    const hasTileCarriage = /(?:^|\/)tile_carriage\.scad$/i.test(normalizedMain);
+    if (hasTileCarriage && part === "assembly") {
+      const names = ["guide", "carriage", "front_wheels", "cutter", "washers", "axles"];
+      const parts = [];
+      for (const name of names) {
+        parts.push(
+          await compileStl(inputFiles, inputMain, { ...vars, part: name }, preview, logs)
+        );
+      }
+      const stl = mergeBinStl(parts);
+      self.postMessage({ id, ok: true, stl, parts, log: logs.join("\n") }, [stl, ...parts]);
+      return;
+    }
+
     const stl = await compileStl(inputFiles, inputMain, vars, preview, logs);
     self.postMessage({ id, ok: true, stl, log: logs.join("\n") }, [stl]);
   } catch (err) {

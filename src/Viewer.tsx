@@ -25,7 +25,32 @@ function partColors(vars: Vars = {}) {
   return { box, lidUpper, lidLower };
 }
 
-function colorFor(part: string, index: number, count: number, vars: Vars = {}) {
+function colorFor(part: string, index: number, count: number, vars: Vars = {}, downloadName = "") {
+  if (/^tile-cutter-/i.test(downloadName) && count >= 2) {
+    const trolleyColors = [
+      hexColor(vars.guide_color, 0x1677e8),
+      hexColor(vars.trolley_color, 0xed8b35),
+      hexColor(vars.bearing_color, 0x424b54),
+      hexColor(vars.bolt_color, 0x252a30),
+      hexColor(vars.bolt_color, 0x252a30),
+      hexColor(vars.bolt_color, 0x252a30),
+      hexColor(vars.cutter_arm_color, 0xd99a32),
+      hexColor(vars.cutter_wheel_color, 0xb8bec4),
+      hexColor(vars.bolt_color, 0x252a30),
+    ];
+    return trolleyColors[index] ?? FALLBACK.other;
+  }
+  if (/^tile_carriage-/i.test(downloadName) && count >= 6) {
+    const carriageColors = [
+      hexColor(vars.guide_color, 0x1677e8),
+      hexColor(vars.carriage_color, 0xed8b35),
+      hexColor(vars.front_wheel_color, 0x424b54),
+      hexColor(vars.cutter_color, 0xb8bec4),
+      hexColor(vars.washer_color, 0xb9bec4),
+      hexColor(vars.axle_color, 0x252a30),
+    ];
+    return carriageColors[index] ?? FALLBACK.other;
+  }
   const c = partColors(vars);
   if (count > 1) {
     const seq = [c.box, c.lidUpper, c.lidLower, c.lidUpper, c.lidLower];
@@ -152,22 +177,22 @@ export function Viewer({
     if (!buffers.length) return;
 
     const loader = new STLLoader();
-    const geoms = buffers.map((buf) => {
+    const geoms = buffers.map((buf, index) => {
       const geom = loader.parse(buf);
       geom.computeVertexNormals();
       geom.computeBoundingBox();
-      return geom;
-    });
+      return { geom, index };
+    }).filter(({ geom }) => geom.attributes.position.count > 0);
 
     const world = new THREE.Box3();
-    for (const g of geoms) world.union(g.boundingBox!);
+    for (const { geom } of geoms) world.union(geom.boundingBox!);
     const ox = -(world.min.x + world.max.x) / 2;
     const oy = -(world.min.y + world.max.y) / 2;
     const oz = -world.min.z;
-    for (const [i, g] of geoms.entries()) {
+    for (const { geom: g, index } of geoms) {
       g.translate(ox, oy, oz);
       const mat = new THREE.MeshStandardMaterial({
-        color: colorFor(part, i, geoms.length, vars),
+        color: colorFor(part, index, buffers.length, vars, downloadName),
         metalness: 0.05,
         roughness: 0.45,
       });

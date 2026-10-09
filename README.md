@@ -1,6 +1,6 @@
 # Parametric OpenSCAD Models
 
-This repository contains three configurable OpenSCAD projects and a browser-based playground for previewing, rendering, and exporting them. All model dimensions are in millimetres, and the models are self-contained without external OpenSCAD libraries.
+This repository contains five configurable OpenSCAD projects and a browser-based playground for previewing, rendering, and exporting them. All model dimensions are in millimetres, and the models are self-contained without external OpenSCAD libraries.
 
 ## Online playground
 
@@ -11,6 +11,8 @@ Direct links:
 - [Drill plate and water cover](https://afinageny.github.io/drillbox/?file=drillbox.scad)
 - [Sliding-lid storage box](https://afinageny.github.io/drillbox/?file=lidbox.scad)
 - [Shuttlecock tube](https://afinageny.github.io/drillbox/?file=shuttlecock_tube.scad)
+- [Tile scoring carriage](https://afinageny.github.io/drillbox/?file=tile_carriage.scad)
+- [Tile cutter carriage variant](https://afinageny.github.io/drillbox/?file=tile-cutter.scad)
 
 Use **Preview** while adjusting parameters, **Render** for final geometry, **STL** to export the currently selected part, and **PNG** to save the current camera view.
 
@@ -71,6 +73,20 @@ Available views and parts:
 - `thread_test` — a short neck and matching cap for checking thread fit.
 
 The body diameter, length, wall, wave count, wave depth, twist rate, and twist distribution are configurable. Thread pitch, depth, and clearances can be tuned for a specific printer. Cap controls adjust the rounded end, spiral grooves, standing diameter, and the internal head pocket. `cap_headroom_height` reserves extra space for the cork head and blends the pocket directly into the threaded cavity.
+
+### Tile scoring carriage
+
+File: [`openscad/tile_carriage.scad`](openscad/tile_carriage.scad)
+
+A compact, hand-pressed three-point carriage for scoring a large tile alongside a rectangular guide rule. Two matching front wheels and a rear scoring disc contact the tile. The rounded upper shell and perimeter skirt form one continuous body, with the same rounded outline carried down the skirt and a rounded upper edge. Viewed from below, a narrow U-shaped rear skirt wraps around the cutter and opens toward the rear so the cutter is visible from behind. Tapered ties connect the U to the side skirts. Wheels and cutter ride on smooth, separate axle pins that press upward from below into snap-fit fork seats. Integral heads on each axle end keep it from sliding sideways, and the washers are separate parts. The preview omits the tile so the carriage underside remains visible. Select whether the rule is on the left, right, or both sides. The browser preview colors the rule, carriage, wheels, cutter, washers, and axles separately, with each color adjustable in the customizer.
+
+The rule defaults to 50 × 10 mm, the front wheels to 20 mm diameter, and the cutting line to the middle of the 55 mm carriage width. Wheel and cutter dimensions, guide clearance, skirt clearance, top edge radius, corner radius, and axle/fork sizes are editable in the browser customizer. The body and guide are conceptual first-pass geometry; verify the actual cutter and wheel dimensions before printing a functional part.
+
+### Tile cutter bearing trolley
+
+File: [`openscad/tile-cutter.scad`](openscad/tile-cutter.scad)
+
+This is a shape-only prototype of the first trolley piece. It sits directly on the rectangular guide and follows the reference top outline: a central plate as wide as the guide, narrower tabs at both ends, and short side wings. The plate is 10 mm thick by default; guide and outline dimensions are adjustable in the customizer. Wheels and their fasteners are intentionally omitted at this stage.
 
 ## Printing workflow
 
