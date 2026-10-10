@@ -291,6 +291,20 @@ module threaded_shaft(length, nominal_d, pitch, pilot_ratio) {
     }
 }
 
+// Axial shaft with a smooth bearing surface and a threaded fastening segment.
+module partial_thread_shaft(length, d, thread_start, thread_end, ratio=thread_pilot_ratio) {
+    union() {
+        if (thread_start > -length/2)
+            translate([0,0,(-length/2+thread_start)/2])
+                cylinder(d=d, h=thread_start+length/2+eps, center=true);
+        if (thread_end < length/2)
+            translate([0,0,(thread_end+length/2)/2])
+                cylinder(d=d, h=length/2-thread_end+eps, center=true);
+        translate([0,0,(thread_start+thread_end)/2])
+            threaded_shaft(thread_end-thread_start, d, thread_pitch, ratio);
+    }
+}
+
 // A 45-degree chamfer replaces the bed-facing roundover; the opposite face stays round.
 // bed_on_top lets the arm print upside down with the same flat, printable footing.
 module comfortable_plate(height, corner_r=body_corner_radius, edge_r=body_edge_radius,
@@ -404,8 +418,7 @@ module trolley_plate() {
 // Smooth half ellipses remain below the arm's upper surface.
 fin_center_y = -hinge_end_sign*fin_offset;
 
-module elliptical_guides(clearance=0) {
-    for (side=[-1, 1])
+module elliptical_guide(side, clearance=0) {
         translate([side*fin_spacing/2, fin_center_y, trolley_thickness-eps])
             multmatrix([[0,0,1,0],[1,0,0,0],[0,1,0,0],[0,0,0,1]])
                 linear_extrude(height=fin_thickness+2*clearance, center=true)
@@ -415,6 +428,10 @@ module elliptical_guides(clearance=0) {
                             [for (i=[0:64])
                                 [fin_length/2*cos(180*i/64),
                                  fin_height*sin(180*i/64)]]));
+}
+
+module elliptical_guides(clearance=0) {
+    for (side=[-1, 1]) elliptical_guide(side, clearance);
 }
 
 function fin_top_in_arm(a) =
@@ -437,13 +454,14 @@ module elliptical_guide_pockets() {
     // Sweep the guides through the arm's full movement, including pressing.
     // The roof assertion keeps these pockets blind, with a solid grip surface.
     steps = 18;
-    for (i=[0:steps-1])
+    // Hull each guide separately so the material between the slots remains solid.
+    for (side=[-1, 1], i=[0:steps-1])
         hull()
             for (j=[i, i+1])
                 rotate([-depth_stop_angle+(35+depth_stop_angle)*j/steps, 0, 0])
                     rotate([0, 0, cutter_end_sign > 0 ? 180 : 0])
                         translate([0, -hinge_axis_y, -(hinge_axis_z-body_bottom_z)])
-                            elliptical_guides(fin_slot_clearance);
+                            elliptical_guide(side, fin_slot_clearance);
 }
 
 module small_depth_stop() {
@@ -535,8 +553,9 @@ module wheel_screw(side, y) {
     shaft_center_x = (shaft_outer_x+shaft_inner_x)/2;
     translate([side*shaft_center_x, y, body_bottom_z+axle_local_z])
         rotate([0, 90, 0])
-            threaded_shaft(shaft_length, thread_diameter, thread_pitch,
-                           thread_pilot_ratio);
+            partial_thread_shaft(shaft_length, thread_diameter,
+                side > 0 ? -shaft_length/2 : shaft_center_x-mount_outer_x,
+                side > 0 ? mount_outer_x-shaft_center_x : shaft_length/2);
     translate([side*(bearing_center_x+bearing_width/2+screw_head_thickness/2), y,
                body_bottom_z+axle_local_z])
         rotate([0, 90, 0]) cylinder(d=screw_head_diameter,
@@ -549,8 +568,8 @@ module side_wheel_screw(y) {
     shaft_top_z = body_bottom_z+thread_engagement-screw_end_clearance;
     shaft_length = shaft_top_z-shaft_bottom_z;
     translate([side_bearing_center_x, y, (shaft_bottom_z+shaft_top_z)/2])
-        threaded_shaft(shaft_length, thread_diameter, thread_pitch,
-                       thread_pilot_ratio);
+        partial_thread_shaft(shaft_length, thread_diameter,
+            body_bottom_z-(shaft_bottom_z+shaft_top_z)/2, shaft_length/2);
     translate([side_bearing_center_x, y,
                bearing_bottom_z-screw_head_thickness/2])
         cylinder(d=screw_head_diameter, h=screw_head_thickness,
@@ -567,8 +586,8 @@ module single_side_bolt_and_nut() {
     shaft_length = shaft_top_z-shaft_bottom_z;
     translate([single_side_bearing_center_x, single_side_bearing_y,
                (shaft_bottom_z+shaft_top_z)/2])
-        threaded_shaft(shaft_length, thread_diameter, thread_pitch,
-                       thread_pilot_ratio);
+        partial_thread_shaft(shaft_length, thread_diameter,
+            nut_center_z-nut_thickness/2-(shaft_bottom_z+shaft_top_z)/2, shaft_length/2);
     translate([single_side_bearing_center_x, single_side_bearing_y,
                bearing_bottom_z-screw_head_thickness/2])
         cylinder(d=screw_head_diameter, h=screw_head_thickness,
@@ -583,7 +602,7 @@ module single_side_nut() {
                nut_center_z])
         difference() {
             cylinder(d=nut_outer_diameter, h=nut_thickness, center=true, $fn=6);
-            cylinder(d=thread_diameter, h=nut_thickness+2*eps, center=true);
+            threaded_hole(nut_thickness+2*eps, thread_diameter, thread_pitch, thread_pilot_ratio);
         }
 }
 
@@ -685,8 +704,10 @@ module cutter_axle_local() {
 
     translate([shaft_center_x, cutter_local_y, cutter_axle_local_z])
         rotate([0, 90, 0])
-            threaded_shaft(shaft_length, cutter_axle_diameter, thread_pitch,
-                           cutter_thread_pilot_ratio);
+            partial_thread_shaft(shaft_length, cutter_axle_diameter,
+                cutter_side_sign > 0 ? -shaft_length/2 : cutter_inner_cheek_x-cutter_fork_thickness/2-shaft_center_x,
+                cutter_side_sign > 0 ? cutter_inner_cheek_x+cutter_fork_thickness/2-shaft_center_x : shaft_length/2,
+                cutter_thread_pilot_ratio);
     translate([head_center_x, cutter_local_y, cutter_axle_local_z])
         rotate([0, 90, 0])
             cylinder(d=cutter_axle_head_diameter,
@@ -701,14 +722,15 @@ module place_on_cutter_arm() {
 
 module hinge_pin() {
     ear_outer_x = hinge_ear_center_x+hinge_ear_thickness/2;
-    pin_left_x = -ear_outer_x-hinge_head_thickness;
-    pin_right_x = ear_outer_x+hinge_nut_thickness;
+    pin_left_x = -ear_outer_x-hinge_washer_thickness-hinge_head_thickness;
+    pin_right_x = ear_outer_x+hinge_washer_thickness+hinge_nut_thickness+thread_pitch;
     pin_length = pin_right_x-pin_left_x;
     pin_center_x = (pin_right_x+pin_left_x)/2;
     translate([pin_center_x, hinge_axis_y, hinge_axis_z])
         rotate([0, 90, 0])
-            cylinder(d=hinge_pin_diameter, h=pin_length, center=true);
-    translate([-ear_outer_x-hinge_head_thickness/2,
+            partial_thread_shaft(pin_length, hinge_pin_diameter,
+                ear_outer_x+hinge_washer_thickness-pin_center_x, pin_length/2);
+    translate([-ear_outer_x-hinge_washer_thickness-hinge_head_thickness/2,
                hinge_axis_y, hinge_axis_z])
         rotate([0, 90, 0])
             cylinder(d=hinge_head_diameter, h=hinge_head_thickness,
@@ -718,14 +740,14 @@ module hinge_pin() {
 module hinge_nut() {
     ear_outer_x = hinge_ear_center_x+hinge_ear_thickness/2;
     nut_outer_diameter = hinge_nut_width_across_flats/cos(30);
-    translate([ear_outer_x+hinge_nut_thickness/2,
+    translate([ear_outer_x+hinge_washer_thickness+hinge_nut_thickness/2,
                hinge_axis_y, hinge_axis_z])
         rotate([0, 90, 0])
             difference() {
                 cylinder(d=nut_outer_diameter, h=hinge_nut_thickness,
                          center=true, $fn=6);
-                cylinder(d=hinge_pin_diameter,
-                         h=hinge_nut_thickness+2*eps, center=true);
+                threaded_hole(hinge_nut_thickness+2*eps, hinge_pin_diameter,
+                              thread_pitch, thread_pilot_ratio);
             }
 }
 
@@ -790,6 +812,54 @@ module print_layout() {
     trolley();
     translate([trolley_half_width+gap+arm_half_width,
                -cutter_arm_length/2+hinge_front_inset, 0]) cutter_arm_print();
+
+    // Reuse assembly geometry, undo its placement, and put screw heads on the bed.
+    row_y = max(trolley_length/2+trolley_end_tab_length, cutter_arm_length/2)+gap;
+    screw_step = max(screw_head_diameter, cutter_axle_head_diameter,
+                     hinge_head_diameter)+gap;
+    wheel_head_x = bearing_center_x+bearing_width/2+screw_head_thickness;
+    side_bottom_z = side_bearing_center_z-bearing_width/2-screw_head_thickness;
+    color(bolt_color) {
+        for (i=[0:3])
+            translate([i*screw_step, row_y, 0]) rotate([0, 90, 0])
+                translate([-wheel_head_x, 0, -(body_bottom_z+axle_local_z)])
+                    wheel_screw(1, 0);
+        for (i=[0:1])
+            translate([(i+4)*screw_step, row_y, 0])
+                translate([-side_bearing_center_x, 0, -side_bottom_z]) side_wheel_screw(0);
+        translate([6*screw_step, row_y, 0])
+            translate([-single_side_bearing_center_x, -single_side_bearing_y, -side_bottom_z])
+                single_side_bolt_and_nut();
+        ear_outer_x = hinge_ear_center_x+hinge_ear_thickness/2;
+        translate([7*screw_step, row_y, 0]) rotate([0, -90, 0])
+            translate([ear_outer_x+hinge_washer_thickness+hinge_head_thickness, -hinge_axis_y, -hinge_axis_z]) hinge_pin();
+        cutter_head_x = cutter_outer_cheek_x+cutter_side_sign*
+                        (cutter_fork_thickness/2+cutter_axle_head_thickness);
+        translate([8*screw_step, row_y, 0]) rotate([0, cutter_side_sign*90, 0])
+            translate([-cutter_head_x, -cutter_local_y, -cutter_axle_local_z]) cutter_axle_local();
+        translate([0, row_y+screw_step, nut_thickness/2])
+            translate([-single_side_bearing_center_x, -single_side_bearing_y,
+                       -(body_top_z-nut_recess_below_top-nut_thickness/2)]) single_side_nut();
+        translate([screw_step, row_y+screw_step, hinge_nut_thickness/2]) rotate([0, 90, 0])
+            translate([-(ear_outer_x+hinge_washer_thickness+hinge_nut_thickness/2), -hinge_axis_y, -hinge_axis_z]) hinge_nut();
+        for (i=[0:1])
+            translate([(i+2)*screw_step, row_y+screw_step, 0])
+                difference() {
+                    cylinder(d=hinge_washer_outer_diameter, h=hinge_washer_thickness);
+                    translate([0,0,-eps]) cylinder(d=hinge_pin_diameter+2*hinge_hole_clearance,
+                                                  h=hinge_washer_thickness+2*eps);
+                }
+    }
+    // Seven bearing models and the cutter wheel, flat faces on the bed.
+    disc_step = max(bearing_outer_diameter, cutter_outer_diameter)+gap;
+    for (i=[0:6])
+        color(bearing_color) translate([i*disc_step, row_y+2*disc_step, bearing_width/2])
+            rotate([0,90,0]) bearing_disc();
+    color(cutter_wheel_color)
+        translate([7*disc_step, row_y+2*disc_step, cutter_width/2])
+            rotate([0,90,0]) translate([-cutter_local_x,-cutter_local_y,-cutter_axle_local_z])
+                cutter_wheel_local();
+    translate([guide_width/2, row_y+3*disc_step+guide_length/2, 0]) guide();
 }
 
 module cutter_arm_placed() {
