@@ -136,8 +136,8 @@ self.onmessage = async (event) => {
 
     const normalizedMain = inputMain.replace(/\\/g, "/");
     const hasTileCutter = /(?:^|\/)tile-cutter\.scad$/i.test(normalizedMain);
-    if (hasTileCutter && part === "assembly") {
-      const names = [
+    if (hasTileCutter && (part === "assembly" || part === "print")) {
+      const names = part === "print" ? ["trolley", "cutter_arm_print"] : [
         "guide", "trolley_placed", "bearings", "bolts", "nuts", "washers", "cutter_arm_placed",
         "cutter_wheel_placed", "cutter_axle_placed"
       ];

@@ -4,7 +4,7 @@
 // Units: millimetres.
 
 /* [View] */
-part = "assembly"; // [assembly, guide, trolley, bearings, bolts, nuts, washers, cutter_arm, cutter_wheel, cutter_axle]
+part = "assembly"; // [assembly, print, guide, trolley, bearings, bolts, nuts, washers, cutter_arm, cutter_arm_print, cutter_wheel, cutter_axle]
 
 /* [Guide] */
 guide_width = 50; // [20:1:100]
@@ -18,8 +18,12 @@ trolley_thickness = 10; // [6:0.5:20]
 trolley_end_width = 35; // [20:1:60] Width between the outer threaded faces of the wheel mounts.
 trolley_end_tab_length = 16; // [13:1:35] Must be longer than the wheel diameter.
 side_wing_extension = 12; // [5:1:25]
-side_wing_length = 65; // [40:1:120]
+side_wing_length = 80; // [40:1:120] At least the central plate length; no corner cutouts.
 trolley_guide_clearance = 1; // [0.2:0.1:3]
+
+/* [Comfort rounding] */
+body_corner_radius = 3; // [0:0.5:6] Outer corners in plan view.
+body_edge_radius = 1; // [0:0.25:2] Rounded upper and lower edges.
 
 /* [Top bearings] */
 bearing_outer_diameter = 12; // [8:0.5:30]
@@ -64,10 +68,11 @@ cutter_arm_thickness = 10; // [6:0.5:20] Same as trolley thickness by default.
 cutter_arm_angle = 0; // [0:1:35] Raised angle of the free end; zero puts the cutter on the tile.
 hinge_end = "far"; // [near,far] Hinge at the far end; cutter arm spans back over the trolley.
 hinge_front_inset = 6; // [3:0.5:12] Axis distance from the arm's front end.
-hinge_edge_inset = 7; // [5:0.5:15] Axis distance from the trolley's front edge.
+hinge_edge_inset = 10; // [5:0.5:25] Axis distance from the trolley's front edge.
 hinge_lift = 3; // [0:0.5:8] Gap that lets the cutter arm move down under hand pressure.
 hinge_ear_thickness = 3; // [2:0.5:6]
 hinge_ear_length = 14; // [10:1:24]
+hinge_base_radius = 1; // [0:0.25:3] Small concave fillet where each ear meets the trolley.
 hinge_side_clearance = 0.2; // [0.1:0.05:1]
 hinge_pin_diameter = 4; // [3:1:8]
 hinge_hole_clearance = 0.15; // [0.1:0.05:0.8]
@@ -83,8 +88,6 @@ cut_side = "left"; // [right,left] Right-handed operation cuts on the operator's
 cutter_end = "near"; // [near,far] Longitudinal position relative to the operator.
 cutter_rest_clearance = 1.5; // [0:0.25:4] Cutter gap above the tile before pressing.
 cutter_depth_limit = 0.3; // [0:0.1:1.5] Maximum cutter penetration into the tile.
-cutter_stop_width = 24; // [12:1:40] Width of the underside depth stop.
-cutter_stop_length = 12; // [8:1:24] Length along the arm.
 cut_line_offset = 10; // [5:1:40] Distance from the selected guide face to the cutting line.
 cutter_end_inset = 12; // [8:1:30] Distance from the free end of the arm to the cutter axis.
 cutter_outer_diameter = 22; // [10:0.5:40]
@@ -101,12 +104,20 @@ cutter_axle_head_diameter = 7; // [5:0.5:14]
 cutter_axle_head_thickness = 3; // [2:0.5:6]
 cutter_axle_end_clearance = 0.4; // [0.1:0.1:1]
 
-/* [Anti-tilt guide pyramids] */
-guide_end_pyramid_y = -34; // [-45:1:0] Single guide near the cutter end.
-guide_end_pyramid_base_width = 28; // [18:1:40] Wider central guide at the cutter end.
-guide_end_pyramid_top_width = 14; // [8:1:28]
-guide_pyramid_height = 3; // [1:0.25:6]
-guide_pyramid_clearance = 0.35; // [0.15:0.05:1]
+/* [Enclosed elliptical arm guides] */
+fin_length = 60; // [40:1:120] Half-ellipse length along the trolley.
+fin_offset = 10; // [0:1:25] Shift away from the hinge toward the opposite edge.
+fin_height = 6; // [4:0.5:10] Height above the trolley top.
+fin_spacing = 38; // [18:1:38] Distance between guide centre lines, near the top wheel tracks.
+fin_thickness = 3; // [2:0.5:5]
+fin_slot_clearance = 0.25; // [0.1:0.05:0.8]
+fin_roof_thickness = 2; // [1.5:0.5:4] Solid material above the blind slots.
+
+/* [Depth stop] */
+depth_stop_y = -34; // [-45:1:0]
+depth_stop_width = 6; // [4:1:12] Small square stop, separate from side guidance.
+depth_stop_height = 3; // [1:0.25:6]
+depth_stop_clearance = 0.35; // [0.15:0.05:1]
 
 /* [Display] */
 guide_color = "#1677e8";
@@ -124,6 +135,7 @@ thread_clearance = 0.18; // Printed radial allowance in internal threads.
 bearing_radius = bearing_outer_diameter/2;
 mount_station_y = trolley_length/2+trolley_end_tab_length/2;
 mount_outer_x = trolley_end_width/2;
+effective_side_wing_length = max(side_wing_length, trolley_length);
 bearing_center_x = guide_width/2-bearing_edge_margin-bearing_width/2;
 axle_local_z = bearing_radius-trolley_guide_clearance;
 body_bottom_z = guide_height+trolley_guide_clearance;
@@ -154,7 +166,21 @@ cutter_local_x = cutter_side_sign*(guide_width/2+cut_line_offset);
 cutter_local_y = -cutter_arm_length+hinge_front_inset+cutter_end_inset;
 // At zero arm angle the wheel touches the same work plane as the guide.
 cutter_axle_local_z = cutter_radius+cutter_rest_clearance-hinge_axis_z;
-cutter_depth_stop_height = hinge_lift-cutter_depth_limit;
+// Solve the downward arm rotation at the requested wheel penetration.
+function stop_angle(lo=0, hi=30, n=28) =
+    n == 0 ? (lo+hi)/2 :
+    let(a=(lo+hi)/2,
+        wheel_z=hinge_axis_z+cutter_local_y*sin(a)+cutter_axle_local_z*cos(a))
+    wheel_z > cutter_radius-cutter_depth_limit
+        ? stop_angle(a, hi, n-1) : stop_angle(lo, a, n-1);
+depth_stop_angle = stop_angle();
+depth_stop_local_y = arm_x_sign*(depth_stop_y-hinge_axis_y);
+// The free-end edge of the small stop touches the flat pocket roof first.
+depth_stop_contact_y = depth_stop_local_y-depth_stop_width/2;
+depth_stop_roof_z =
+    (body_top_z+depth_stop_height-hinge_axis_z-
+     depth_stop_contact_y*sin(depth_stop_angle))/cos(depth_stop_angle);
+depth_stop_slot_depth = cutter_arm_thickness/2+depth_stop_roof_z;
 cutter_cheek_offset =
     cutter_width/2+cutter_fork_axial_clearance+cutter_fork_thickness/2;
 cutter_inner_cheek_x = cutter_local_x-cutter_side_sign*cutter_cheek_offset;
@@ -172,13 +198,13 @@ assert(mount_outer_x > thread_engagement,
        "Wheel mount is too narrow for the selected threaded engagement");
 assert(thread_engagement < trolley_thickness,
        "Side-bearing threaded holes must remain blind");
-assert(side_bearing_spacing+bearing_outer_diameter <= side_wing_length,
+assert(side_bearing_spacing+bearing_outer_diameter <= effective_side_wing_length,
        "Side bearings do not fit along the overhanging wing");
 assert(side_wing_extension >= bearing_radius+fixed_side_edge_clearance,
        "The overhanging wing is too short to carry a side bearing");
 assert(side_bearing_center_z-bearing_width/2-screw_head_thickness >= 0,
        "Side bearing screw head extends below the work surface");
-assert(abs(single_side_bearing_y)+bearing_radius <= side_wing_length/2,
+assert(abs(single_side_bearing_y)+bearing_radius <= effective_side_wing_length/2,
        "Single side bearing does not fit below the opposite wing");
 assert(abs(single_side_adjustment) <= single_side_adjustment_travel/2,
        "Single side bearing preview position lies outside its adjustment slot");
@@ -194,6 +220,13 @@ assert(cutter_arm_thickness == trolley_thickness,
 assert(cutter_arm_width+2*(hinge_side_clearance+hinge_ear_thickness)
        <= guide_width+2*side_wing_extension,
        "Cutter arm hinge is wider than the trolley");
+// Keep the complete hinge foot on the filled side wings, away from their rounded edge.
+assert(abs(hinge_axis_y)+hinge_ear_length/2+hinge_base_radius+
+       body_edge_radius+0.3*body_corner_radius <= effective_side_wing_length/2,
+       "Move the hinge inward: its feet must fit on the existing side wings");
+assert(mount_station_y-abs(hinge_axis_y)-hinge_ear_length/2-hinge_base_radius
+       > bearing_radius+bearing_radial_clearance,
+       "Hinge feet are too close to the top bearings");
 assert(cutter_arm_body_width/2 >=
        abs(cutter_outer_cheek_x)+cutter_fork_thickness/2,
        "Cutter arm is too narrow for the offset cutter fork");
@@ -201,8 +234,8 @@ assert(cutter_arm_end_width >= cutter_arm_body_width,
        "Cutter end width must be at least the body width");
 assert(cutter_arm_neck_length < cutter_arm_length-hinge_front_inset,
        "Cutter arm neck leaves no room for its wide body");
-assert(cutter_depth_stop_height > 0,
-       "Cutter depth limit must be smaller than hinge lift");
+assert(depth_stop_slot_depth > 0 && depth_stop_slot_depth < cutter_arm_thickness,
+       "Adjust stop height or hinge lift so the depth-stop pocket fits inside the arm");
 assert(hinge_front_inset < cutter_arm_length &&
        hinge_edge_inset < trolley_length/2,
        "Hinge position must lie inside the arm and trolley");
@@ -258,6 +291,43 @@ module threaded_shaft(length, nominal_d, pitch, pilot_ratio) {
     }
 }
 
+// A 45-degree chamfer replaces the bed-facing roundover; the opposite face stays round.
+// bed_on_top lets the arm print upside down with the same flat, printable footing.
+module comfortable_plate(height, corner_r=body_corner_radius, edge_r=body_edge_radius,
+                         bed_on_top=false) {
+    r = min(edge_r, height/2-eps);
+    if (bed_on_top)
+        translate([0, 0, height]) mirror([0, 0, 1])
+            comfortable_plate(height, corner_r, edge_r) children();
+    else if (r > 0)
+        union() {
+            intersection() {
+                translate([0, 0, r])
+                    minkowski() {
+                        linear_extrude(height=height-2*r)
+                            offset(delta=-r)
+                                offset(r=max(corner_r, r))
+                                    offset(delta=-max(corner_r, r)) children();
+                        sphere(r=r, $fn=$preview ? 16 : 32);
+                    }
+                translate([-10000, -10000, r-eps])
+                    cube([20000, 20000, height]);
+            }
+            minkowski() {
+                linear_extrude(height=eps)
+                    offset(delta=-r)
+                        offset(r=max(corner_r, r))
+                            offset(delta=-max(corner_r, r)) children();
+                cylinder(h=r, r1=0, r2=r, $fn=$preview ? 32 : 64);
+            }
+        }
+    else
+        linear_extrude(height=height)
+            if (corner_r > 0)
+                offset(r=corner_r) offset(delta=-corner_r) children();
+            else children();
+}
+
 module trolley_outline_2d() {
     union() {
         square([guide_width, trolley_length], center=true);
@@ -266,7 +336,7 @@ module trolley_outline_2d() {
                 square([trolley_end_width, trolley_end_tab_length], center=true);
         for (side = [-1, 1])
             translate([side*(guide_width/2+side_wing_extension/2), 0])
-                square([side_wing_extension, side_wing_length], center=true);
+                square([side_wing_extension, effective_side_wing_length], center=true);
     }
 }
 
@@ -321,7 +391,7 @@ module single_side_nut_pocket() {
 
 module trolley_plate() {
     difference() {
-        linear_extrude(height=trolley_thickness) trolley_outline_2d();
+        comfortable_plate(trolley_thickness) trolley_outline_2d();
         for (side = [-1, 1], end = [-1, 1])
             wheel_mount_cut(side, end*mount_station_y);
         for (y = [-side_bearing_spacing/2, side_bearing_spacing/2])
@@ -331,16 +401,55 @@ module trolley_plate() {
     }
 }
 
-module guide_end_pyramid() {
-    translate([0, guide_end_pyramid_y, trolley_thickness])
-        linear_extrude(height=guide_pyramid_height,
-                       scale=guide_end_pyramid_top_width/guide_end_pyramid_base_width)
-            square([guide_end_pyramid_base_width, guide_end_pyramid_base_width],
-                   center=true);
+// Smooth half ellipses remain below the arm's upper surface.
+fin_center_y = -hinge_end_sign*fin_offset;
+
+module elliptical_guides(clearance=0) {
+    for (side=[-1, 1])
+        translate([side*fin_spacing/2, fin_center_y, trolley_thickness-eps])
+            multmatrix([[0,0,1,0],[1,0,0,0],[0,1,0,0],[0,0,0,1]])
+                linear_extrude(height=fin_thickness+2*clearance, center=true)
+                    offset(r=clearance)
+                        polygon(concat(
+                            [[-fin_length/2, 0], [fin_length/2, 0]],
+                            [for (i=[0:64])
+                                [fin_length/2*cos(180*i/64),
+                                 fin_height*sin(180*i/64)]]));
 }
 
-module guide_pyramids() {
-    guide_end_pyramid();
+function fin_top_in_arm(a) =
+    sqrt(pow(fin_length/2*sin(a),2)+pow(fin_height*cos(a),2))
+    -(hinge_lift+cutter_arm_thickness/2)*cos(a)
+    +arm_x_sign*(fin_center_y-hinge_axis_y)*sin(a)+fin_slot_clearance;
+assert(abs(fin_center_y)+fin_length/2 <= trolley_length/2,
+       "Elliptical guides must stay within the trolley length");
+assert(fin_height > hinge_lift+fin_slot_clearance,
+       "Guides must enter the arm's underside pockets");
+assert(fin_spacing/2+fin_thickness/2+fin_slot_clearance+body_edge_radius
+       < cutter_arm_width/2,
+       "Guide pockets must remain inside the arm sides");
+assert(max([for (i=[0:36])
+           fin_top_in_arm(-depth_stop_angle+(35+depth_stop_angle)*i/36)])
+       < cutter_arm_thickness/2-fin_roof_thickness,
+       "Guides would protrude above the arm: reduce their height or length");
+
+module elliptical_guide_pockets() {
+    // Sweep the guides through the arm's full movement, including pressing.
+    // The roof assertion keeps these pockets blind, with a solid grip surface.
+    steps = 18;
+    for (i=[0:steps-1])
+        hull()
+            for (j=[i, i+1])
+                rotate([-depth_stop_angle+(35+depth_stop_angle)*j/steps, 0, 0])
+                    rotate([0, 0, cutter_end_sign > 0 ? 180 : 0])
+                        translate([0, -hinge_axis_y, -(hinge_axis_z-body_bottom_z)])
+                            elliptical_guides(fin_slot_clearance);
+}
+
+module small_depth_stop() {
+    translate([0, depth_stop_y, trolley_thickness])
+        linear_extrude(height=depth_stop_height)
+            square([depth_stop_width, depth_stop_width], center=true);
 }
 
 module hinge_ears() {
@@ -348,10 +457,30 @@ module hinge_ears() {
     ear_height = hinge_lift+cutter_arm_thickness;
     for (side = [-1, 1])
         difference() {
-            translate([side*hinge_ear_center_x, hinge_axis_y,
-                       trolley_thickness+ear_height/2])
-                cube([hinge_ear_thickness, hinge_ear_length,
-                      ear_height], center=true);
+            union() {
+                translate([side*hinge_ear_center_x, hinge_axis_y, trolley_thickness])
+                    comfortable_plate(ear_height,
+                                      min(body_corner_radius, hinge_ear_thickness/4),
+                                      min(body_edge_radius, hinge_ear_thickness/4))
+                        square([hinge_ear_thickness, hinge_ear_length], center=true);
+                // Inverse quarter-circle fillet: broad only at the plate surface,
+                // then concave toward the vertical ear. Keep the inner hinge face clear.
+                r = hinge_base_radius;
+                steps = $preview ? 12 : 24;
+                if (r > 0)
+                    for (i = [0:steps-1])
+                        hull()
+                            for (j = [i, i+1]) {
+                                z = r*j/steps;
+                                spread = r-sqrt(max(0, r*r-(r-z)*(r-z)));
+                                translate([side*(hinge_ear_center_x+spread/2),
+                                           hinge_axis_y, trolley_thickness+z-eps])
+                                    comfortable_plate(2*eps,
+                                                      min(0.5, hinge_ear_thickness/4), 0)
+                                        square([hinge_ear_thickness+spread,
+                                                hinge_ear_length+2*spread], center=true);
+                            }
+            }
             translate([side*hinge_ear_center_x, hinge_axis_y,
                        trolley_thickness+hinge_lift+cutter_arm_thickness/2])
                 rotate([0, 90, 0])
@@ -363,7 +492,8 @@ module hinge_ears() {
 module trolley_solid() {
     union() {
         trolley_plate();
-        guide_pyramids();
+        small_depth_stop();
+        elliptical_guides();
         hinge_ears();
     }
 }
@@ -489,53 +619,46 @@ module cutter_fork() {
                       cutter_axle_diameter*cutter_thread_pilot_ratio);
 }
 
-module guide_pyramid_slots() {
-    slot_depth = guide_pyramid_height+guide_pyramid_clearance;
-    end_slot_top_width = guide_end_pyramid_top_width + 2*guide_pyramid_clearance;
-    end_slot_base_width = guide_end_pyramid_base_width + 2*guide_pyramid_clearance;
-    translate([0, guide_end_pyramid_y-hinge_axis_y, -cutter_arm_thickness/2])
-        linear_extrude(height=slot_depth,
-                       scale=end_slot_base_width/end_slot_top_width)
-            square([end_slot_top_width, end_slot_top_width], center=true);
+module depth_stop_pocket() {
+    // A roomy pocket receives the stop; only its roof sets the pressing limit.
+    slot_width = depth_stop_width+2*depth_stop_clearance;
+    translate([0, depth_stop_local_y, -cutter_arm_thickness/2-eps])
+        linear_extrude(height=depth_stop_slot_depth+eps)
+            square([slot_width, slot_width], center=true);
 }
 
-// Fixed underside stop: it contacts the trolley before the scoring wheel
-// can be pressed deeper than cutter_depth_limit into the tile.
-module cutter_depth_stop() {
-    translate([0, cutter_local_y,
-               -cutter_arm_thickness/2-cutter_depth_stop_height/2])
-        cube([cutter_stop_width, cutter_stop_length,
-              cutter_depth_stop_height], center=true);
+module cutter_arm_outline_2d() {
+    union() {
+            // Narrow front neck carries the transverse hinge pin.
+            translate([0, (hinge_front_inset-cutter_arm_neck_length)/2])
+                square([cutter_arm_width,
+                      hinge_front_inset+cutter_arm_neck_length], center=true);
+            // Wider rear body leaves room for the scoring-wheel mount.
+            wide_length =
+                cutter_arm_length-hinge_front_inset-cutter_arm_neck_length;
+            body_length = wide_length-cutter_arm_end_length;
+            translate([0, -cutter_arm_neck_length-body_length/2])
+                square([cutter_arm_body_width, body_length], center=true);
+            // A small widened pad surrounds the cutter axle at the free end.
+            translate([0, -cutter_arm_neck_length-body_length-
+                       cutter_arm_end_length/2])
+                square([cutter_arm_end_width, cutter_arm_end_length], center=true);
+    }
 }
 
 // Arm is centred on the hinge axis; the free end extends toward -Y.
 module cutter_arm_centered() {
     difference() {
         union() {
-            // Narrow front neck carries the transverse hinge pin.
-            translate([0, (hinge_front_inset-cutter_arm_neck_length)/2, 0])
-                cube([cutter_arm_width,
-                      hinge_front_inset+cutter_arm_neck_length,
-                      cutter_arm_thickness], center=true);
-            // Wider rear body leaves room for the scoring-wheel mount.
-            wide_length =
-                cutter_arm_length-hinge_front_inset-cutter_arm_neck_length;
-            body_length = wide_length-cutter_arm_end_length;
-            translate([0, -cutter_arm_neck_length-body_length/2, 0])
-                cube([cutter_arm_body_width, body_length,
-                      cutter_arm_thickness], center=true);
-            // A small widened pad surrounds the cutter axle at the free end.
-            translate([0, -cutter_arm_neck_length-body_length-
-                       cutter_arm_end_length/2, 0])
-                cube([cutter_arm_end_width, cutter_arm_end_length,
-                      cutter_arm_thickness], center=true);
+            translate([0, 0, -cutter_arm_thickness/2])
+                comfortable_plate(cutter_arm_thickness, bed_on_top=true) cutter_arm_outline_2d();
             cutter_fork();
-            cutter_depth_stop();
         }
         rotate([0, 90, 0])
             cylinder(d=hinge_pin_diameter+2*hinge_hole_clearance,
                      h=cutter_arm_width+2*eps, center=true);
-        guide_pyramid_slots();
+        depth_stop_pocket();
+        elliptical_guide_pockets();
     }
 }
 
@@ -653,6 +776,22 @@ module cutter_arm() {
     color(cutter_arm_color)
         translate([0, 0, cutter_arm_thickness/2]) cutter_arm_centered();
 }
+// Upper grip face on the bed; fork and all blind pockets face upward.
+module cutter_arm_print() {
+    color(cutter_arm_color)
+        translate([0, 0, cutter_arm_thickness/2])
+            rotate([180, 0, 0]) cutter_arm_centered();
+}
+
+module print_layout() {
+    gap = 12;
+    trolley_half_width = guide_width/2+side_wing_extension;
+    arm_half_width = max(cutter_arm_width, cutter_arm_body_width, cutter_arm_end_width)/2;
+    trolley();
+    translate([trolley_half_width+gap+arm_half_width,
+               -cutter_arm_length/2+hinge_front_inset, 0]) cutter_arm_print();
+}
+
 module cutter_arm_placed() {
     color(cutter_arm_color)
         place_on_cutter_arm() cutter_arm_centered();
@@ -702,6 +841,7 @@ module assembly() {
 }
 
 if (part == "assembly") assembly();
+else if (part == "print") print_layout();
 else if (part == "guide") guide();
 else if (part == "trolley") trolley();
 else if (part == "trolley_placed") trolley_placed();
@@ -710,6 +850,7 @@ else if (part == "bolts") bolts();
 else if (part == "nuts") nuts();
 else if (part == "washers") washers();
 else if (part == "cutter_arm") cutter_arm();
+else if (part == "cutter_arm_print") cutter_arm_print();
 else if (part == "cutter_arm_placed") cutter_arm_placed();
 else if (part == "cutter_wheel") cutter_wheel();
 else if (part == "cutter_wheel_placed") cutter_wheel_placed();

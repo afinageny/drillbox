@@ -27,6 +27,10 @@ function partColors(vars: Vars = {}) {
 
 function colorFor(part: string, index: number, count: number, vars: Vars = {}, downloadName = "") {
   if (/^tile-cutter-/i.test(downloadName) && count >= 2) {
+    if (part === "print") return [
+      hexColor(vars.trolley_color, 0xed8b35),
+      hexColor(vars.cutter_arm_color, 0xd99a32),
+    ][index] ?? FALLBACK.other;
     const trolleyColors = [
       hexColor(vars.guide_color, 0x1677e8),
       hexColor(vars.trolley_color, 0xed8b35),
