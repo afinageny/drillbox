@@ -1,6 +1,6 @@
 // First-piece tile-cutter trolley with four top-running bearings
 // and three side guide bearings.
-// All bearings are installed with M4 screws.
+// Bearing and cutter screw sizes follow their bore diameters.
 // Units: millimetres.
 
 /* [View] */
@@ -15,53 +15,43 @@ show_guide = true;
 /* [Trolley outline] */
 trolley_length = 80; // [50:1:140]
 trolley_thickness = 10; // [6:0.5:20]
-trolley_end_width = 35; // [20:1:60] Width between the outer threaded faces of the wheel mounts.
-trolley_end_tab_length = 16; // [13:1:35] Must be longer than the wheel diameter.
-side_wing_extension = 12; // [5:1:25]
+trolley_end_width = 22; // [20:1:60] Width between the outer threaded faces of the wheel mounts.
+trolley_end_tab_length = 24; // [13:1:35] Must be longer than the wheel diameter.
+side_wing_extension = 23; // [5:1:25] Matches the 96 mm arm body and encloses the M8 nut pocket.
 side_wing_length = 80; // [40:1:120] At least the central plate length; no corner cutouts.
-trolley_guide_clearance = 1; // [0.2:0.1:3]
 
 /* [Comfort rounding] */
 body_corner_radius = 3; // [0:0.5:6] Outer corners in plan view.
 body_edge_radius = 1; // [0:0.25:2] Rounded upper and lower edges.
 
 /* [Top bearings] */
-bearing_outer_diameter = 12; // [8:0.5:30]
-bearing_width = 4; // [3:0.5:12]
-bearing_bore_diameter = 4.2; // [3:0.1:12]
+bearing_outer_diameter = 22; // [8:0.5:30]
+bearing_width = 8; // [3:0.5:12]
+bearing_bore_diameter = 8; // [3:0.1:12]
 bearing_radial_clearance = 0.4; // [0.1:0.1:1]
 bearing_axial_clearance = 0.3; // [0.1:0.1:1]
-bearing_edge_margin = 3; // [0.5:0.5:8] Reserves space for the screw head inside the guide width.
+bearing_edge_margin = 5; // [0.5:0.5:8] Reserves space for the screw head inside the guide width.
 
 /* [Side guide bearings] */
 side_bearing_side = "left"; // [right,left] Two fixed guide bearings are on the operator's side.
 side_bearing_spacing = 44; // [20:1:70] Distance between the two side bearing axes.
 fixed_side_edge_clearance = 0; // [0:0.05:1] The two fixed bearings touch the guide face.
 adjustable_side_nominal_clearance = 0.3; // [0:0.1:1] Centre position of the adjustable bearing.
-side_bearing_axial_clearance = 0.3; // [0.1:0.1:1] Gap below the overhanging wing.
 single_side_bearing_y = 0; // [-25:1:25] Position of the opposite single bearing.
 single_side_adjustment_travel = 2; // [0.5:0.5:6] Total slot travel toward/away from the guide.
 single_side_adjustment = 0; // [-3:0.1:3] Preview position; positive moves the bearing toward the guide.
 
 /* [Wheel screws] */
-thread_diameter = 4; // [3:1:8] Metric screw diameter; 4 means M4.
-thread_pitch = 0.7; // [0.5:0.05:1.5]
-thread_engagement = 6; // [4:0.5:12]
-thread_pilot_ratio = 0.825; // [0.75:0.005:0.95]
-screw_head_diameter = 7; // [5:0.5:14]
-screw_head_thickness = 3; // [2:0.5:6]
 screw_end_clearance = 0.4; // [0.1:0.1:1]
 through_hole_clearance = 0.3; // [0.1:0.1:0.8]
-nut_width_across_flats = 7; // [5:0.5:14]
-nut_thickness = 3.2; // [2:0.2:8]
 nut_pocket_clearance = 0.3; // [0.1:0.1:1]
 nut_recess_below_top = 0.2; // [0:0.1:2] Nut top sits below the trolley surface.
 
 /* [Cutter arm and hinge] */
 cutter_arm_length = 96; // [60:1:130]
 cutter_arm_width = 44; // [25:1:60] Narrow hinge neck width.
-cutter_arm_body_width = 86; // [60:1:140] Wide section carrying the offset cutter.
-cutter_arm_end_width = 86; // [70:1:140] No unnecessary overhang beyond the cutter body.
+cutter_arm_body_width = 96; // [60:1:140] Wide section carrying the offset cutter.
+cutter_arm_end_width = 96; // [70:1:140] No unnecessary overhang beyond the cutter body.
 cutter_arm_end_length = 18; // [10:1:35] Length of the widened cutter end.
 cutter_arm_neck_length = 10; // [10:1:30] Length of the narrow section behind the hinge.
 cutter_arm_thickness = 10; // [6:0.5:20] Same as trolley thickness by default.
@@ -69,7 +59,7 @@ cutter_arm_angle = 0; // [0:1:35] Raised angle of the free end; zero puts the cu
 hinge_end = "far"; // [near,far] Hinge at the far end; cutter arm spans back over the trolley.
 hinge_front_inset = 6; // [3:0.5:12] Axis distance from the arm's front end.
 hinge_edge_inset = 10; // [5:0.5:25] Axis distance from the trolley's front edge.
-hinge_lift = 3; // [0:0.5:8] Gap that lets the cutter arm move down under hand pressure.
+hinge_lift = 8.5; // [0:0.5:12] Gap that lets the cutter arm move down under hand pressure.
 hinge_ear_thickness = 3; // [2:0.5:6]
 hinge_ear_length = 14; // [10:1:24]
 hinge_base_radius = 1; // [0:0.25:3] Small concave fillet where each ear meets the trolley.
@@ -89,25 +79,21 @@ cutter_end = "near"; // [near,far] Longitudinal position relative to the operato
 cutter_rest_clearance = 1.5; // [0:0.25:4] Cutter gap above the tile before pressing.
 cutter_depth_limit = 0.3; // [0:0.1:1.5] Maximum cutter penetration into the tile.
 cut_line_offset = 10; // [5:1:40] Distance from the selected guide face to the cutting line.
-cutter_end_inset = 12; // [8:1:30] Distance from the free end of the arm to the cutter axis.
+cutter_end_inset = 8; // [8:1:30] Distance from the free end of the arm to the cutter axis.
 cutter_outer_diameter = 22; // [10:0.5:40]
-cutter_width = 3; // [1:0.5:8]
-cutter_bore_diameter = 4.2; // [3:0.1:10]
+cutter_width = 5; // [1:0.5:8]
+cutter_bore_diameter = 6; // [3:0.1:10]
 cutter_fork_thickness = 6; // [4:0.5:10]
 cutter_fork_axial_clearance = 0.3; // [0.1:0.1:1]
 cutter_fork_depth = 14; // [10:1:24]
 cutter_fork_boss_diameter = 12; // [8:1:20]
-cutter_axle_diameter = 4; // [3:1:8] Metric screw diameter; 4 means M4.
 cutter_axle_clearance = 0.25; // [0.1:0.05:0.8]
-cutter_thread_pilot_ratio = 0.825; // [0.75:0.005:0.95]
-cutter_axle_head_diameter = 7; // [5:0.5:14]
-cutter_axle_head_thickness = 3; // [2:0.5:6]
 cutter_axle_end_clearance = 0.4; // [0.1:0.1:1]
 
 /* [Enclosed elliptical arm guides] */
 fin_length = 60; // [40:1:120] Half-ellipse length along the trolley.
 fin_offset = 10; // [0:1:25] Shift away from the hinge toward the opposite edge.
-fin_height = 6; // [4:0.5:10] Height above the trolley top.
+fin_height = 10; // [4:0.5:14] Height above the trolley top.
 fin_spacing = 38; // [18:1:38] Distance between guide centre lines, near the top wheel tracks.
 fin_thickness = 3; // [2:0.5:5]
 fin_slot_clearance = 0.25; // [0.1:0.05:0.8]
@@ -116,7 +102,7 @@ fin_roof_thickness = 2; // [1.5:0.5:4] Solid material above the blind slots.
 /* [Depth stop] */
 depth_stop_y = -34; // [-45:1:0]
 depth_stop_width = 6; // [4:1:12] Small square stop, separate from side guidance.
-depth_stop_height = 3; // [1:0.25:6]
+depth_stop_height = 8.5; // [1:0.25:12]
 depth_stop_clearance = 0.35; // [0.15:0.05:1]
 
 /* [Display] */
@@ -130,6 +116,22 @@ cutter_wheel_color = "#b8bec4";
 /* [Hidden] */
 $fn = $preview ? 48 : 96;
 eps = 0.02;
+function metric_pitch(d) = d <= 3 ? 0.5 : d <= 4 ? 0.7 : d <= 5 ? 0.8 :
+                           d <= 6 ? 1 : d <= 8 ? 1.25 : d <= 10 ? 1.5 : 1.75;
+function thread_ratio(d) = (d-1.22687*metric_pitch(d))/d;
+thread_diameter = bearing_bore_diameter;
+thread_pitch = metric_pitch(thread_diameter);
+thread_engagement = min(0.75*thread_diameter, trolley_thickness-2);
+thread_pilot_ratio = thread_ratio(thread_diameter);
+screw_head_diameter = thread_diameter*1.625;
+screw_head_thickness = thread_diameter*0.625;
+nut_width_across_flats = thread_diameter*1.625;
+nut_thickness = thread_diameter*0.8125;
+cutter_axle_diameter = cutter_bore_diameter;
+cutter_thread_pitch = metric_pitch(cutter_axle_diameter);
+cutter_thread_pilot_ratio = thread_ratio(cutter_axle_diameter);
+cutter_axle_head_diameter = cutter_axle_diameter*1.625;
+cutter_axle_head_thickness = cutter_axle_diameter*0.625;
 thread_profile_width = 0.42; // Fraction of pitch occupied by each thread flank.
 thread_clearance = 0.18; // Printed radial allowance in internal threads.
 bearing_radius = bearing_outer_diameter/2;
@@ -137,8 +139,9 @@ mount_station_y = trolley_length/2+trolley_end_tab_length/2;
 mount_outer_x = trolley_end_width/2;
 effective_side_wing_length = max(side_wing_length, trolley_length);
 bearing_center_x = guide_width/2-bearing_edge_margin-bearing_width/2;
-axle_local_z = bearing_radius-trolley_guide_clearance;
-body_bottom_z = guide_height+trolley_guide_clearance;
+// Centre the running-wheel axes in the platform while keeping wheel contact.
+axle_local_z = trolley_thickness/2;
+body_bottom_z = guide_height+bearing_radius-axle_local_z;
 thread_pilot_diameter = thread_diameter*thread_pilot_ratio;
 bearing_inner_x = bearing_center_x-bearing_width/2;
 side_sign = side_bearing_side == "left" ? -1 : 1;
@@ -148,7 +151,12 @@ single_side_slot_center_x =
     single_side_sign*(guide_width/2+bearing_radius+adjustable_side_nominal_clearance);
 single_side_bearing_center_x =
     single_side_slot_center_x-single_side_sign*single_side_adjustment;
-side_bearing_center_z = body_bottom_z-side_bearing_axial_clearance-bearing_width/2;
+// Full bearing width lies on the guide face; a thin integral flange stays above the tile.
+side_bearing_center_z = guide_height-bearing_width/2;
+side_flange_thickness = 1.5;
+side_flange_diameter = thread_diameter*1.5;
+side_support_bottom_z = guide_height-body_bottom_z;
+side_support_height = -side_support_bottom_z;
 body_top_z = body_bottom_z+trolley_thickness;
 hinge_end_sign = hinge_end == "near" ? -1 : 1;
 hinge_axis_y = hinge_end_sign*(trolley_length/2-hinge_edge_inset);
@@ -202,8 +210,13 @@ assert(side_bearing_spacing+bearing_outer_diameter <= effective_side_wing_length
        "Side bearings do not fit along the overhanging wing");
 assert(side_wing_extension >= bearing_radius+fixed_side_edge_clearance,
        "The overhanging wing is too short to carry a side bearing");
-assert(side_bearing_center_z-bearing_width/2-screw_head_thickness >= 0,
-       "Side bearing screw head extends below the work surface");
+assert(side_bearing_center_z-bearing_width/2-side_flange_thickness >= 0.3,
+       "Side bearing flange must clear the work surface by at least 0.3 mm");
+assert(side_bearing_center_z-bearing_width/2 >= 0 &&
+       side_bearing_center_z+bearing_width/2 <= guide_height,
+       "The complete side-bearing width must lie on the guide face");
+assert(side_support_height >= 0,
+       "Side-bearing supports do not fit below the platform");
 assert(abs(single_side_bearing_y)+bearing_radius <= effective_side_wing_length/2,
        "Single side bearing does not fit below the opposite wing");
 assert(abs(single_side_adjustment) <= single_side_adjustment_travel/2,
@@ -248,6 +261,10 @@ assert(cutter_bore_diameter >= cutter_axle_diameter,
 assert(cutter_end_inset > cutter_radius/2 &&
        cutter_end_inset+cutter_radius/2 < cutter_arm_length-hinge_front_inset,
        "Cutter axis must remain inside the wide arm section");
+assert(abs(hinge_axis_y+arm_x_sign*(cutter_local_y*cos(depth_stop_angle)-
+       cutter_axle_local_z*sin(depth_stop_angle))) >
+       effective_side_wing_length/2+cutter_radius,
+       "Pressed cutter wheel hits the trolley edge: move it toward the free end");
 assert(cutter_fork_boss_diameter >
        cutter_axle_diameter+2*cutter_axle_clearance,
        "Cutter axle hole leaves too little material in the fork");
@@ -255,6 +272,16 @@ assert(bearing_bore_diameter >= thread_diameter,
        "Bearing bore must be at least as large as the screw thread");
 assert(axle_local_z > 0 && axle_local_z < trolley_thickness,
        "Bearing axle must pass through the trolley thickness");
+assert(trolley_thickness/2 > (thread_diameter+thread_clearance)/2+body_edge_radius/2,
+       "Bearing thread breaks through the platform: increase its thickness");
+assert(guide_width/2+side_wing_extension >
+       abs(single_side_slot_center_x)+single_side_adjustment_travel/2+
+       (nut_width_across_flats+2*nut_pocket_clearance)/(2*cos(30))+body_edge_radius,
+       "Adjustable nut pocket is too close to the trolley edge");
+assert((abs(hinge_axis_y)+mount_station_y)*sin(depth_stop_angle)+
+       (body_bottom_z+axle_local_z-hinge_axis_z)*cos(depth_stop_angle)+bearing_radius
+       < -cutter_arm_thickness/2,
+       "Pressed cutter arm hits a running bearing: raise the hinge and guides");
 assert(trolley_length+2*trolley_end_tab_length <= guide_length,
        "Trolley outline must fit on the guide length");
 
@@ -292,7 +319,7 @@ module threaded_shaft(length, nominal_d, pitch, pilot_ratio) {
 }
 
 // Axial shaft with a smooth bearing surface and a threaded fastening segment.
-module partial_thread_shaft(length, d, thread_start, thread_end, ratio=thread_pilot_ratio) {
+module partial_thread_shaft(length, d, thread_start, thread_end, ratio=thread_ratio(d)) {
     union() {
         if (thread_start > -length/2)
             translate([0,0,(-length/2+thread_start)/2])
@@ -301,7 +328,7 @@ module partial_thread_shaft(length, d, thread_start, thread_end, ratio=thread_pi
             translate([0,0,(thread_end+length/2)/2])
                 cylinder(d=d, h=length/2-thread_end+eps, center=true);
         translate([0,0,(thread_start+thread_end)/2])
-            threaded_shaft(thread_end-thread_start, d, thread_pitch, ratio);
+            threaded_shaft(thread_end-thread_start, d, metric_pitch(d), ratio);
     }
 }
 
@@ -359,7 +386,7 @@ module guide_solid() {
         cube([guide_width, guide_length, guide_height]);
 }
 
-// M4 tap-drill bore enters the outside face of each front/rear mount.
+// Bore sized for the bearing axle thread enters the outside face of each front/rear mount.
 // The bearing itself remains outside the printed body, close to the guide edge.
 module wheel_mount_cut(side, y) {
     hole_center_x = side*(mount_outer_x-thread_engagement/2);
@@ -368,13 +395,29 @@ module wheel_mount_cut(side, y) {
                       thread_pilot_ratio);
 }
 
-// Vertical pilot holes for the two M4 side-bearing screws.
+// Fixed side axles now pass through the supports and are secured by captive nuts above.
 module side_wheel_mount_cut(y) {
-    local_x = side_bearing_center_x;
-    // Open at the underside (z=0) and stop inside the plate.
-    translate([local_x, y, thread_engagement/2-eps])
-        threaded_hole(thread_engagement+2*eps, thread_diameter, thread_pitch,
-                      thread_pilot_ratio);
+    translate([side_bearing_center_x, y, side_support_bottom_z-eps])
+        cylinder(d=thread_diameter+through_hole_clearance,
+                 h=trolley_thickness+side_support_height+2*eps);
+}
+
+module side_supports() {
+    for (y = [-side_bearing_spacing/2, side_bearing_spacing/2])
+        translate([side_bearing_center_x, y, side_support_bottom_z])
+            cylinder(d=side_flange_diameter, h=side_support_height+eps);
+    hull()
+        for (dx = [-single_side_adjustment_travel/2, single_side_adjustment_travel/2])
+            translate([single_side_slot_center_x+dx, single_side_bearing_y,
+                       side_support_bottom_z])
+                cylinder(d=side_flange_diameter, h=side_support_height+eps);
+}
+
+module fixed_side_nut_pocket(y) {
+    pocket_depth = nut_thickness+nut_recess_below_top+nut_pocket_clearance;
+    translate([side_bearing_center_x, y, trolley_thickness-pocket_depth])
+        cylinder(d=(nut_width_across_flats+2*nut_pocket_clearance)/cos(30),
+                 h=pocket_depth+eps, $fn=6);
 }
 
 // The opposite single bearing uses a through-hole and a separate nut on top.
@@ -384,9 +427,9 @@ module single_side_through_hole() {
         for (dx = [-single_side_adjustment_travel/2,
                     single_side_adjustment_travel/2])
             translate([single_side_slot_center_x+dx, single_side_bearing_y,
-                       trolley_thickness/2])
+                       (trolley_thickness+side_support_bottom_z)/2])
                 cylinder(d=thread_diameter+through_hole_clearance,
-                         h=trolley_thickness+2*eps, center=true);
+                         h=trolley_thickness+side_support_height+2*eps, center=true);
 }
 
 // Swept hexagonal pocket lets the recessed nut follow the adjustment slot.
@@ -405,11 +448,14 @@ module single_side_nut_pocket() {
 
 module trolley_plate() {
     difference() {
-        comfortable_plate(trolley_thickness) trolley_outline_2d();
+        union() {
+            comfortable_plate(trolley_thickness) trolley_outline_2d();
+            side_supports();
+        }
         for (side = [-1, 1], end = [-1, 1])
             wheel_mount_cut(side, end*mount_station_y);
         for (y = [-side_bearing_spacing/2, side_bearing_spacing/2])
-            side_wheel_mount_cut(y);
+            { side_wheel_mount_cut(y); fixed_side_nut_pocket(y); }
         single_side_through_hole();
         single_side_nut_pocket();
     }
@@ -562,36 +608,34 @@ module wheel_screw(side, y) {
                                    h=screw_head_thickness, center=true, $fn=6);
 }
 
-module side_wheel_screw(y) {
+// Integral mushroom flange supports the inner ring; the bearing runs on a smooth shank.
+module side_mushroom_axle(x, y) {
     bearing_bottom_z = side_bearing_center_z-bearing_width/2;
-    shaft_bottom_z = bearing_bottom_z-screw_head_thickness;
-    shaft_top_z = body_bottom_z+thread_engagement-screw_end_clearance;
+    shaft_bottom_z = bearing_bottom_z-side_flange_thickness;
+    shaft_top_z = body_top_z-nut_recess_below_top;
     shaft_length = shaft_top_z-shaft_bottom_z;
-    translate([side_bearing_center_x, y, (shaft_bottom_z+shaft_top_z)/2])
-        partial_thread_shaft(shaft_length, thread_diameter,
-            body_bottom_z-(shaft_bottom_z+shaft_top_z)/2, shaft_length/2);
-    translate([side_bearing_center_x, y,
-               bearing_bottom_z-screw_head_thickness/2])
-        cylinder(d=screw_head_diameter, h=screw_head_thickness,
-                 center=true, $fn=6);
+    shaft_center_z = (shaft_bottom_z+shaft_top_z)/2;
+    difference() {
+        union() {
+            translate([x, y, shaft_center_z])
+                partial_thread_shaft(shaft_length, thread_diameter,
+                                     body_bottom_z-shaft_center_z, shaft_length/2);
+            translate([x, y, shaft_bottom_z])
+                cylinder(d1=thread_diameter, d2=side_flange_diameter,
+                         h=side_flange_thickness);
+        }
+        // Underside screwdriver slot prevents the axle turning with the top nut.
+        translate([x, y, shaft_bottom_z+0.3-eps])
+            cube([side_flange_diameter+eps, 1.2, 0.6+2*eps], center=true);
+    }
+}
+
+module side_wheel_screw(y) {
+    side_mushroom_axle(side_bearing_center_x, y);
 }
 
 module single_side_bolt_and_nut() {
-    bearing_bottom_z = side_bearing_center_z-bearing_width/2;
-    shaft_bottom_z = bearing_bottom_z-screw_head_thickness;
-    body_top_z = body_bottom_z+trolley_thickness;
-    nut_center_z =
-        body_top_z-nut_recess_below_top-nut_thickness/2;
-    shaft_top_z = nut_center_z+nut_thickness/2;
-    shaft_length = shaft_top_z-shaft_bottom_z;
-    translate([single_side_bearing_center_x, single_side_bearing_y,
-               (shaft_bottom_z+shaft_top_z)/2])
-        partial_thread_shaft(shaft_length, thread_diameter,
-            nut_center_z-nut_thickness/2-(shaft_bottom_z+shaft_top_z)/2, shaft_length/2);
-    translate([single_side_bearing_center_x, single_side_bearing_y,
-               bearing_bottom_z-screw_head_thickness/2])
-        cylinder(d=screw_head_diameter, h=screw_head_thickness,
-                 center=true, $fn=6);
+    side_mushroom_axle(single_side_bearing_center_x, single_side_bearing_y);
 }
 
 module single_side_nut() {
@@ -620,7 +664,7 @@ module cutter_fork_cheek(x, hole_diameter) {
             rotate([0, 90, 0]) {
                 if (hole_diameter < cutter_axle_diameter)
                     threaded_hole(cutter_fork_thickness+2*eps,
-                                  cutter_axle_diameter, thread_pitch,
+                                  cutter_axle_diameter, cutter_thread_pitch,
                                   cutter_thread_pilot_ratio);
                 else
                     cylinder(d=hole_diameter,
@@ -630,8 +674,7 @@ module cutter_fork_cheek(x, hole_diameter) {
 }
 
 module cutter_fork() {
-    // The outer cheek has a free M4 clearance hole. The inner cheek has
-    // an M4 pilot hole for tapping or a self-threading screw.
+    // Both cheeks follow the cutter bore: outer clearance, inner thread.
     cutter_fork_cheek(cutter_outer_cheek_x,
                       cutter_axle_diameter+2*cutter_axle_clearance);
     cutter_fork_cheek(cutter_inner_cheek_x,
@@ -723,7 +766,7 @@ module place_on_cutter_arm() {
 module hinge_pin() {
     ear_outer_x = hinge_ear_center_x+hinge_ear_thickness/2;
     pin_left_x = -ear_outer_x-hinge_washer_thickness-hinge_head_thickness;
-    pin_right_x = ear_outer_x+hinge_washer_thickness+hinge_nut_thickness+thread_pitch;
+    pin_right_x = ear_outer_x+hinge_washer_thickness+hinge_nut_thickness+metric_pitch(hinge_pin_diameter);
     pin_length = pin_right_x-pin_left_x;
     pin_center_x = (pin_right_x+pin_left_x)/2;
     translate([pin_center_x, hinge_axis_y, hinge_axis_z])
@@ -747,7 +790,7 @@ module hinge_nut() {
                 cylinder(d=nut_outer_diameter, h=hinge_nut_thickness,
                          center=true, $fn=6);
                 threaded_hole(hinge_nut_thickness+2*eps, hinge_pin_diameter,
-                              thread_pitch, thread_pilot_ratio);
+                              metric_pitch(hinge_pin_diameter), thread_ratio(hinge_pin_diameter));
             }
 }
 
@@ -788,6 +831,9 @@ module bolts() {
 module nuts() {
     color(bolt_color) {
         single_side_nut();
+        for (y = [-side_bearing_spacing/2, side_bearing_spacing/2])
+            translate([side_bearing_center_x-single_side_bearing_center_x,
+                       y-single_side_bearing_y, 0]) single_side_nut();
         hinge_nut();
     }
 }
@@ -809,7 +855,7 @@ module print_layout() {
     gap = 12;
     trolley_half_width = guide_width/2+side_wing_extension;
     arm_half_width = max(cutter_arm_width, cutter_arm_body_width, cutter_arm_end_width)/2;
-    trolley();
+    translate([0, 0, side_support_height]) trolley();
     translate([trolley_half_width+gap+arm_half_width,
                -cutter_arm_length/2+hinge_front_inset, 0]) cutter_arm_print();
 
@@ -818,7 +864,7 @@ module print_layout() {
     screw_step = max(screw_head_diameter, cutter_axle_head_diameter,
                      hinge_head_diameter)+gap;
     wheel_head_x = bearing_center_x+bearing_width/2+screw_head_thickness;
-    side_bottom_z = side_bearing_center_z-bearing_width/2-screw_head_thickness;
+    side_bottom_z = side_bearing_center_z-bearing_width/2-side_flange_thickness;
     color(bolt_color) {
         for (i=[0:3])
             translate([i*screw_step, row_y, 0]) rotate([0, 90, 0])
@@ -840,6 +886,10 @@ module print_layout() {
         translate([0, row_y+screw_step, nut_thickness/2])
             translate([-single_side_bearing_center_x, -single_side_bearing_y,
                        -(body_top_z-nut_recess_below_top-nut_thickness/2)]) single_side_nut();
+        for (i=[0:1])
+            translate([(i+4)*screw_step, row_y+screw_step, nut_thickness/2])
+                translate([-single_side_bearing_center_x, -single_side_bearing_y,
+                           -(body_top_z-nut_recess_below_top-nut_thickness/2)]) single_side_nut();
         translate([screw_step, row_y+screw_step, hinge_nut_thickness/2]) rotate([0, 90, 0])
             translate([-(ear_outer_x+hinge_washer_thickness+hinge_nut_thickness/2), -hinge_axis_y, -hinge_axis_z]) hinge_nut();
         for (i=[0:1])
