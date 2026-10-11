@@ -59,7 +59,7 @@ cutter_arm_angle = 0; // [0:1:35] Raised angle of the free end; zero puts the cu
 hinge_end = "far"; // [near,far] Hinge at the far end; cutter arm spans back over the trolley.
 hinge_front_inset = 6; // [3:0.5:12] Axis distance from the arm's front end.
 hinge_edge_inset = 10; // [5:0.5:25] Axis distance from the trolley's front edge.
-hinge_lift = 8.5; // [0:0.5:12] Gap that lets the cutter arm move down under hand pressure.
+hinge_lift = 5; // [0:0.5:12] Gap that lets the cutter arm move down under hand pressure.
 hinge_ear_thickness = 3; // [2:0.5:6]
 hinge_ear_length = 14; // [10:1:24]
 hinge_base_radius = 1; // [0:0.25:3] Small concave fillet where each ear meets the trolley.
@@ -93,7 +93,7 @@ cutter_axle_end_clearance = 0.4; // [0.1:0.1:1]
 /* [Enclosed elliptical arm guides] */
 fin_length = 60; // [40:1:120] Half-ellipse length along the trolley.
 fin_offset = 10; // [0:1:25] Shift away from the hinge toward the opposite edge.
-fin_height = 10; // [4:0.5:14] Height above the trolley top.
+fin_height = 6.5; // [4:0.5:14] Height above the trolley top.
 fin_spacing = 38; // [18:1:38] Distance between guide centre lines, near the top wheel tracks.
 fin_thickness = 3; // [2:0.5:5]
 fin_slot_clearance = 0.25; // [0.1:0.05:0.8]
@@ -102,7 +102,7 @@ fin_roof_thickness = 2; // [1.5:0.5:4] Solid material above the blind slots.
 /* [Depth stop] */
 depth_stop_y = -34; // [-45:1:0]
 depth_stop_width = 6; // [4:1:12] Small square stop, separate from side guidance.
-depth_stop_height = 8.5; // [1:0.25:12]
+depth_stop_height = 5; // [1:0.25:12]
 depth_stop_clearance = 0.35; // [0.15:0.05:1]
 
 /* [Display] */
@@ -278,10 +278,7 @@ assert(guide_width/2+side_wing_extension >
        abs(single_side_slot_center_x)+single_side_adjustment_travel/2+
        (nut_width_across_flats+2*nut_pocket_clearance)/(2*cos(30))+body_edge_radius,
        "Adjustable nut pocket is too close to the trolley edge");
-assert((abs(hinge_axis_y)+mount_station_y)*sin(depth_stop_angle)+
-       (body_bottom_z+axle_local_z-hinge_axis_z)*cos(depth_stop_angle)+bearing_radius
-       < -cutter_arm_thickness/2,
-       "Pressed cutter arm hits a running bearing: raise the hinge and guides");
+// Running bearings enter shallow underside reliefs when the arm is lowered.
 assert(trolley_length+2*trolley_end_tab_length <= guide_length,
        "Trolley outline must fit on the guide length");
 
@@ -319,7 +316,8 @@ module threaded_shaft(length, nominal_d, pitch, pilot_ratio) {
 }
 
 // Axial shaft with a smooth bearing surface and a threaded fastening segment.
-module partial_thread_shaft(length, d, thread_start, thread_end, ratio=thread_ratio(d)) {
+module partial_thread_shaft(length, d, thread_start, thread_end, ratio=undef) {
+    effective_ratio = is_undef(ratio) ? thread_ratio(d) : ratio;
     union() {
         if (thread_start > -length/2)
             translate([0,0,(-length/2+thread_start)/2])
@@ -328,7 +326,7 @@ module partial_thread_shaft(length, d, thread_start, thread_end, ratio=thread_ra
             translate([0,0,(thread_end+length/2)/2])
                 cylinder(d=d, h=length/2-thread_end+eps, center=true);
         translate([0,0,(thread_start+thread_end)/2])
-            threaded_shaft(thread_end-thread_start, d, metric_pitch(d), ratio);
+            threaded_shaft(thread_end-thread_start, d, metric_pitch(d), effective_ratio);
     }
 }
 
@@ -721,7 +719,25 @@ module cutter_arm_centered() {
                      h=cutter_arm_width+2*eps, center=true);
         depth_stop_pocket();
         elliptical_guide_pockets();
+        running_bearing_reliefs();
     }
+}
+
+// Sweep each running bearing into arm coordinates over its complete movement.
+// Separate pockets preserve the material between the wheel tracks.
+module running_bearing_reliefs() {
+    steps = 18;
+    for (side=[-1, 1], end=[-1, 1], i=[0:steps-1])
+        hull()
+            for (j=[i, i+1])
+                rotate([-depth_stop_angle+(35+depth_stop_angle)*j/steps, 0, 0])
+                    rotate([0, 0, cutter_end_sign > 0 ? 180 : 0])
+                        translate([side*bearing_center_x,
+                                   end*mount_station_y-hinge_axis_y,
+                                   body_bottom_z+axle_local_z-hinge_axis_z])
+                            rotate([0, 90, 0])
+                                cylinder(d=bearing_outer_diameter+2*bearing_radial_clearance,
+                                         h=bearing_width+2*bearing_axial_clearance, center=true);
 }
 
 module cutter_wheel_local() {
