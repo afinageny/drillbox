@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Vars } from "./customizer";
 
 const FALLBACK = {
@@ -182,8 +183,9 @@ export function Viewer({
 
     const loader = new STLLoader();
     const geoms = buffers.map((buf, index) => {
-      const geom = loader.parse(buf);
-      geom.computeVertexNormals();
+      const raw = loader.parse(buf);
+      const geom = toCreasedNormals(raw, Math.PI / 6);
+      if (geom !== raw) raw.dispose();
       geom.computeBoundingBox();
       return { geom, index };
     }).filter(({ geom }) => geom.attributes.position.count > 0);

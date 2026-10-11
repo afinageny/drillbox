@@ -54,26 +54,27 @@ cutter_arm_body_width = 86; // [60:1:140] Wide section carrying the offset cutte
 cutter_arm_end_width = 86; // [70:1:140] Matches the trolley's overall width for the default guide.
 cutter_arm_end_length = 18; // [10:1:35] Length of the widened cutter end.
 cutter_arm_opposite_trim = 18; // [0:1:30] Remove unused width opposite the cutter; zero restores the full outline.
-cutter_arm_neck_length = 10; // [10:1:30] Length of the narrow section behind the hinge.
+cutter_arm_neck_length = 16; // [10:1:30] Keeps the wide grip clear of the reinforced ears when raised.
 cutter_arm_thickness = 10; // [6:0.5:20] Same as trolley thickness by default.
 grip_dome_height = 0; // [0:0.5:12] Palm dome height; zero restores the flat arm.
 cutter_arm_angle = 0; // [0:1:35] Raised angle of the free end; zero puts the cutter on the tile.
 hinge_end = "far"; // [near,far] Hinge at the far end; cutter arm spans back over the trolley.
 hinge_front_inset = 6; // [3:0.5:12] Axis distance from the arm's front end.
-hinge_edge_inset = 10; // [5:0.5:25] Axis distance from the trolley's front edge.
+hinge_edge_inset = 12; // [5:0.5:25] Axis distance from the trolley's front edge.
 hinge_lift = 5; // [0:0.5:12] Gap that lets the cutter arm move down under hand pressure.
-hinge_ear_thickness = 3; // [2:0.5:6]
-hinge_ear_length = 14; // [10:1:24]
-hinge_base_radius = 1; // [0:0.25:3] Small concave fillet where each ear meets the trolley.
+hinge_ear_thickness = 5; // [2:0.5:8]
+hinge_ear_length = 16; // [10:1:24]
+hinge_base_radius = 2; // [0:0.25:3] External concave bead around the hinge foot; zero disables it.
+hinge_boss_diameter = 14; // [12:1:20] Local reinforcement around the printed hinge axle.
 hinge_side_clearance = 0.2; // [0.1:0.05:1]
-hinge_pin_diameter = 4; // [3:1:8]
-hinge_hole_clearance = 0.15; // [0.1:0.05:0.8]
-hinge_head_diameter = 7; // [5:0.5:14]
-hinge_head_thickness = 3; // [2:0.5:6]
-hinge_nut_width_across_flats = 7; // [5:0.5:14]
-hinge_nut_thickness = 3.2; // [2:0.2:8]
-hinge_washer_outer_diameter = 9; // [6:0.5:16]
-hinge_washer_thickness = 0.8; // [0.4:0.05:2] Visible external hinge washer.
+hinge_pin_diameter = 8; // [3:1:12]
+hinge_hole_clearance = 0.25; // [0.1:0.05:0.8]
+hinge_head_diameter = 16; // [10:0.5:24]
+hinge_head_thickness = 4; // [2:0.5:6]
+hinge_nut_width_across_flats = 16; // [10:0.5:24]
+hinge_nut_thickness = 6; // [2:0.2:10]
+hinge_washer_outer_diameter = 16; // [10:0.5:24]
+hinge_washer_thickness = 1.2; // [0.4:0.05:2] Printed external hinge washer.
 
 /* [Scoring cutter] */
 cut_side = "left"; // [right,left] Right-handed operation cuts on the operator's side.
@@ -188,8 +189,8 @@ depth_stop_local_y = arm_x_sign*(depth_stop_y-hinge_axis_y);
 // The free-end edge of the small stop touches the flat pocket roof first.
 depth_stop_contact_y = depth_stop_local_y-depth_stop_width/2;
 depth_stop_roof_z =
-    (body_top_z+depth_stop_height-hinge_axis_z-
-     depth_stop_contact_y*sin(depth_stop_angle))/cos(depth_stop_angle);
+    (body_top_z+depth_stop_height-hinge_axis_z)*cos(depth_stop_angle)
+    -depth_stop_contact_y*sin(depth_stop_angle);
 depth_stop_slot_depth = cutter_arm_thickness/2+depth_stop_roof_z;
 cutter_cheek_offset =
     cutter_width/2+cutter_fork_axial_clearance+cutter_fork_thickness/2;
@@ -254,7 +255,7 @@ assert(depth_stop_slot_depth > 0 && depth_stop_slot_depth < cutter_arm_thickness
 assert(hinge_front_inset < cutter_arm_length &&
        hinge_edge_inset < trolley_length/2,
        "Hinge position must lie inside the arm and trolley");
-assert(hinge_pin_diameter+2*hinge_hole_clearance < cutter_arm_thickness,
+assert(hinge_pin_diameter+2*hinge_hole_clearance+4 <= hinge_boss_diameter,
        "Hinge hole does not fit through the cutter arm");
 assert(cutter_outer_diameter > cutter_bore_diameter,
        "Cutter outside diameter must exceed its bore");
@@ -382,11 +383,14 @@ module wheel_mount_cut(side, y) {
                       thread_pilot_ratio);
 }
 
-// Fixed side axles now pass through the supports and are secured by captive nuts above.
+// Fixed axles screw into blind holes from below; the upper face stays solid.
 module side_wheel_mount_cut(y) {
     translate([side_bearing_center_x, y, side_support_bottom_z-eps])
         cylinder(d=thread_diameter+through_hole_clearance,
-                 h=trolley_thickness+side_support_height+2*eps);
+                 h=side_support_height+2*eps);
+    translate([side_bearing_center_x, y, thread_engagement/2-eps])
+        threaded_hole(thread_engagement+2*eps, thread_diameter, thread_pitch,
+                      thread_pilot_ratio);
 }
 
 module side_supports() {
@@ -442,7 +446,7 @@ module trolley_plate() {
         for (side = [-1, 1], end = [-1, 1])
             wheel_mount_cut(side, end*mount_station_y);
         for (y = [-side_bearing_spacing/2, side_bearing_spacing/2])
-            { side_wheel_mount_cut(y); fixed_side_nut_pocket(y); }
+            side_wheel_mount_cut(y);
         single_side_through_hole();
         single_side_nut_pocket();
     }
@@ -503,9 +507,16 @@ module small_depth_stop() {
             square([depth_stop_width, depth_stop_width], center=true);
 }
 
+module hinge_fillet_profile(r) {
+    steps = $preview ? 32 : 64;
+    polygon(concat([[-eps, -eps], [r, -eps]],
+        [for(i=[0:steps]) let(a=90*(1-i/steps))
+            [r-r*cos(a), r-r*sin(a)]], [[-eps, r]]));
+}
+
 module hinge_ears() {
     // Keep the ears joined to the trolley while lifting the hinge axis.
-    ear_height = hinge_lift+cutter_arm_thickness;
+    ear_height = hinge_lift+cutter_arm_thickness/2+hinge_boss_diameter/2+2;
     for (side = [-1, 1])
         difference() {
             union() {
@@ -514,23 +525,7 @@ module hinge_ears() {
                                       min(body_corner_radius, hinge_ear_thickness/4),
                                       min(body_edge_radius, hinge_ear_thickness/4))
                         square([hinge_ear_thickness, hinge_ear_length], center=true);
-                // Inverse quarter-circle fillet: broad only at the plate surface,
-                // then concave toward the vertical ear. Keep the inner hinge face clear.
-                r = hinge_base_radius;
-                steps = $preview ? 12 : 24;
-                if (r > 0)
-                    for (i = [0:steps-1])
-                        hull()
-                            for (j = [i, i+1]) {
-                                z = r*j/steps;
-                                spread = r-sqrt(max(0, r*r-(r-z)*(r-z)));
-                                translate([side*(hinge_ear_center_x+spread/2),
-                                           hinge_axis_y, trolley_thickness+z-eps])
-                                    comfortable_plate(2*eps,
-                                                      min(0.5, hinge_ear_thickness/4), 0)
-                                        square([hinge_ear_thickness+spread,
-                                                hinge_ear_length+2*spread], center=true);
-                            }
+                hinge_base_fillet(side);
             }
             translate([side*hinge_ear_center_x, hinge_axis_y,
                        trolley_thickness+hinge_lift+cutter_arm_thickness/2])
@@ -540,12 +535,43 @@ module hinge_ears() {
         }
 }
 
+// Offset the complete rounded footprint, so the bead wraps around its corners.
+// The quarter-circle profile is tangent to the plate and the vertical ear.
+module hinge_base_fillet(side) {
+    r = hinge_base_radius;
+    steps = $preview ? 40 : 80;
+    corner = min(body_corner_radius, hinge_ear_thickness/4);
+    if (r > 0)
+        translate([side*hinge_ear_center_x, hinge_axis_y, trolley_thickness-eps])
+            {
+                union()
+                    for(i=[0:steps-1])
+                        hull()
+                            for(j=[i,i+1]) {
+                                a = 90*j/steps;
+                                z = r*(1-cos(a));
+                                spread = r*(1-sin(a));
+                                translate([0,0,z])
+                                    linear_extrude(height=eps)
+                                        offset(delta=spread)
+                                            offset(r=corner)
+                                                offset(delta=-corner)
+                                                    square([hinge_ear_thickness,hinge_ear_length], center=true);
+                            }
+            }
+}
+
 module trolley_solid() {
+    difference() {
     union() {
         trolley_plate();
         small_depth_stop();
         elliptical_guides();
         hinge_ears();
+    }
+    // Cut after joining the hinge feet so their fillets cannot fill the blind threads.
+    for (y = [-side_bearing_spacing/2, side_bearing_spacing/2])
+        side_wheel_mount_cut(y);
     }
 }
 
@@ -596,10 +622,11 @@ module wheel_screw(side, y) {
 }
 
 // Integral mushroom flange supports the inner ring; the bearing runs on a smooth shank.
-module side_mushroom_axle(x, y) {
+module side_mushroom_axle(x, y, fixed=false) {
     bearing_bottom_z = side_bearing_center_z-bearing_width/2;
     shaft_bottom_z = bearing_bottom_z-side_flange_thickness;
-    shaft_top_z = body_top_z-nut_recess_below_top;
+    shaft_top_z = fixed ? body_bottom_z+thread_engagement-screw_end_clearance
+                       : body_top_z-nut_recess_below_top;
     shaft_length = shaft_top_z-shaft_bottom_z;
     shaft_center_z = (shaft_bottom_z+shaft_top_z)/2;
     difference() {
@@ -618,7 +645,7 @@ module side_mushroom_axle(x, y) {
 }
 
 module side_wheel_screw(y) {
-    side_mushroom_axle(side_bearing_center_x, y);
+    side_mushroom_axle(side_bearing_center_x, y, fixed=true);
 }
 
 module single_side_bolt_and_nut() {
@@ -736,6 +763,9 @@ module cutter_arm_centered() {
             translate([0, 0, -cutter_arm_thickness/2])
                 comfortable_plate(cutter_arm_thickness) cutter_arm_outline_2d();
             cutter_fork();
+            // Rounded transverse boss keeps the main grip plate at its existing height.
+            rotate([0, 90, 0])
+                hinge_arm_boss();
             palm_dome();
         }
         rotate([0, 90, 0])
@@ -745,6 +775,22 @@ module cutter_arm_centered() {
         elliptical_guide_pockets();
         running_bearing_reliefs();
     }
+}
+
+// Revolve one rounded profile, avoiding mismatched cylinder/sphere facets.
+module hinge_arm_boss() {
+    radius = hinge_boss_diameter/2;
+    half_length = cutter_arm_width/2;
+    r = min(body_edge_radius, radius-eps, half_length-eps);
+    if (r > 0)
+        rotate_extrude($fn=$preview ? 128 : 192)
+            polygon(concat([[0,-half_length]],
+                [for(i=[0:24]) let(a=-90+90*i/24)
+                    [radius-r+r*cos(a), -half_length+r+r*sin(a)]],
+                [for(i=[0:24]) let(a=90*i/24)
+                    [radius-r+r*cos(a), half_length-r+r*sin(a)]],
+                [[0,half_length]]));
+    else cylinder(d=hinge_boss_diameter, h=cutter_arm_width, center=true, $fn=128);
 }
 
 // Offset the palm support toward the scoring wheel, with a longer slope toward the hinge.
@@ -903,9 +949,6 @@ module bolts() {
 module nuts() {
     color(bolt_color) {
         single_side_nut();
-        for (y = [-side_bearing_spacing/2, side_bearing_spacing/2])
-            translate([side_bearing_center_x-single_side_bearing_center_x,
-                       y-single_side_bearing_y, 0]) single_side_nut();
         hinge_nut();
     }
 }
@@ -919,7 +962,7 @@ module cutter_arm() {
 // Upper grip face on the bed; fork and all blind pockets face upward.
 module cutter_arm_print() {
     color(cutter_arm_color)
-        translate([0, 0, cutter_arm_thickness/2])
+        translate([0, 0, max(cutter_arm_thickness, hinge_boss_diameter)/2])
             rotate([180, 0, 0]) cutter_arm_centered();
 }
 
@@ -958,10 +1001,6 @@ module print_layout() {
         translate([0, row_y+screw_step, nut_thickness/2])
             translate([-single_side_bearing_center_x, -single_side_bearing_y,
                        -(body_top_z-nut_recess_below_top-nut_thickness/2)]) single_side_nut();
-        for (i=[0:1])
-            translate([(i+4)*screw_step, row_y+screw_step, nut_thickness/2])
-                translate([-single_side_bearing_center_x, -single_side_bearing_y,
-                           -(body_top_z-nut_recess_below_top-nut_thickness/2)]) single_side_nut();
         translate([screw_step, row_y+screw_step, hinge_nut_thickness/2]) rotate([0, 90, 0])
             translate([-(ear_outer_x+hinge_washer_thickness+hinge_nut_thickness/2), -hinge_axis_y, -hinge_axis_z]) hinge_nut();
         for (i=[0:1])
