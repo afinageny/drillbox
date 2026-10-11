@@ -7,15 +7,15 @@
 part = "assembly"; // [assembly, print, guide, trolley, bearings, bolts, nuts, washers, cutter_arm, cutter_arm_print, cutter_wheel, cutter_axle]
 
 /* [Guide] */
-guide_width = 50; // [20:1:100]
-guide_height = 10; // [5:1:30]
+guide_width = 40; // [20:1:100]
+guide_height = 20; // [5:1:30]
 guide_length = 190; // [80:5:400]
 show_guide = true;
 
 /* [Trolley outline] */
 trolley_length = 80; // [50:1:140]
 trolley_thickness = 10; // [6:0.5:20]
-trolley_end_width = 22; // [20:1:60] Width between the outer threaded faces of the wheel mounts.
+trolley_end_width = 13; // [13:1:60] Width between the outer threaded faces of the wheel mounts.
 trolley_end_tab_length = 24; // [13:1:35] Must be longer than the wheel diameter.
 side_wing_extension = 23; // [5:1:25] Matches the 96 mm arm body and encloses the M8 nut pocket.
 side_wing_length = 80; // [40:1:120] At least the central plate length; no corner cutouts.
@@ -50,11 +50,13 @@ nut_recess_below_top = 0.2; // [0:0.1:2] Nut top sits below the trolley surface.
 /* [Cutter arm and hinge] */
 cutter_arm_length = 96; // [60:1:130]
 cutter_arm_width = 44; // [25:1:60] Narrow hinge neck width.
-cutter_arm_body_width = 96; // [60:1:140] Wide section carrying the offset cutter.
-cutter_arm_end_width = 96; // [70:1:140] No unnecessary overhang beyond the cutter body.
+cutter_arm_body_width = 86; // [60:1:140] Wide section carrying the offset cutter.
+cutter_arm_end_width = 86; // [70:1:140] Matches the trolley's overall width for the default guide.
 cutter_arm_end_length = 18; // [10:1:35] Length of the widened cutter end.
+cutter_arm_opposite_trim = 18; // [0:1:30] Remove unused width opposite the cutter; zero restores the full outline.
 cutter_arm_neck_length = 10; // [10:1:30] Length of the narrow section behind the hinge.
 cutter_arm_thickness = 10; // [6:0.5:20] Same as trolley thickness by default.
+grip_dome_height = 0; // [0:0.5:12] Palm dome height; zero restores the flat arm.
 cutter_arm_angle = 0; // [0:1:35] Raised angle of the free end; zero puts the cutter on the tile.
 hinge_end = "far"; // [near,far] Hinge at the far end; cutter arm spans back over the trolley.
 hinge_front_inset = 6; // [3:0.5:12] Axis distance from the arm's front end.
@@ -330,36 +332,18 @@ module partial_thread_shaft(length, d, thread_start, thread_end, ratio=undef) {
     }
 }
 
-// A 45-degree chamfer replaces the bed-facing roundover; the opposite face stays round.
-// bed_on_top lets the arm print upside down with the same flat, printable footing.
-module comfortable_plate(height, corner_r=body_corner_radius, edge_r=body_edge_radius,
-                         bed_on_top=false) {
+// Matching roundovers on both faces, with rounded corners in plan view.
+module comfortable_plate(height, corner_r=body_corner_radius, edge_r=body_edge_radius) {
     r = min(edge_r, height/2-eps);
-    if (bed_on_top)
-        translate([0, 0, height]) mirror([0, 0, 1])
-            comfortable_plate(height, corner_r, edge_r) children();
-    else if (r > 0)
-        union() {
-            intersection() {
-                translate([0, 0, r])
-                    minkowski() {
-                        linear_extrude(height=height-2*r)
-                            offset(delta=-r)
-                                offset(r=max(corner_r, r))
-                                    offset(delta=-max(corner_r, r)) children();
-                        sphere(r=r, $fn=$preview ? 16 : 32);
-                    }
-                translate([-10000, -10000, r-eps])
-                    cube([20000, 20000, height]);
-            }
+    if (r > 0)
+        translate([0, 0, r])
             minkowski() {
-                linear_extrude(height=eps)
+                linear_extrude(height=height-2*r)
                     offset(delta=-r)
                         offset(r=max(corner_r, r))
                             offset(delta=-max(corner_r, r)) children();
-                cylinder(h=r, r1=0, r2=r, $fn=$preview ? 32 : 64);
+                sphere(r=r, $fn=$preview ? 16 : 32);
             }
-        }
     else
         linear_extrude(height=height)
             if (corner_r > 0)
@@ -368,6 +352,7 @@ module comfortable_plate(height, corner_r=body_corner_radius, edge_r=body_edge_r
 }
 
 module trolley_outline_2d() {
+    difference() {
     union() {
         square([guide_width, trolley_length], center=true);
         for (end = [-1, 1])
@@ -376,6 +361,10 @@ module trolley_outline_2d() {
         for (side = [-1, 1])
             translate([side*(guide_width/2+side_wing_extension/2), 0])
                 square([side_wing_extension, effective_side_wing_length], center=true);
+    }
+    translate([0, hinge_axis_y])
+        rotate(cutter_end_sign > 0 ? 180 : 0)
+            opposite_trim_2d();
     }
 }
 
@@ -649,15 +638,14 @@ module single_side_nut() {
 }
 
 module cutter_fork_cheek(x, hole_diameter) {
+    r = min(body_edge_radius, cutter_fork_thickness/2-eps, 1-eps);
     difference() {
-        hull() {
-            translate([x, cutter_local_y, -cutter_arm_thickness/2+1])
-                cube([cutter_fork_thickness, cutter_fork_depth, 2], center=true);
-            translate([x, cutter_local_y, cutter_axle_local_z])
-                rotate([0, 90, 0])
-                    cylinder(d=cutter_fork_boss_diameter,
-                             h=cutter_fork_thickness, center=true);
-        }
+        if (r > 0)
+            minkowski() {
+                cutter_fork_cheek_core(x, r);
+                sphere(r=r, $fn=$preview ? 16 : 32);
+            }
+        else cutter_fork_cheek_core(x, 0);
         translate([x, cutter_local_y, cutter_axle_local_z])
             rotate([0, 90, 0]) {
                 if (hole_diameter < cutter_axle_diameter)
@@ -669,6 +657,18 @@ module cutter_fork_cheek(x, hole_diameter) {
                              h=cutter_fork_thickness+2*eps, center=true);
             }
     }
+}
+
+// Inset core keeps the original fork envelope after adding the roundover.
+module cutter_fork_cheek_core(x, r) {
+    hull() {
+        translate([x, cutter_local_y, -cutter_arm_thickness/2+1])
+            cube([cutter_fork_thickness-2*r, cutter_fork_depth-2*r, 2-2*r], center=true);
+        translate([x, cutter_local_y, cutter_axle_local_z])
+            rotate([0, 90, 0])
+                cylinder(d=cutter_fork_boss_diameter-2*r,
+                         h=cutter_fork_thickness-2*r, center=true);
+        }
 }
 
 module cutter_fork() {
@@ -688,6 +688,7 @@ module depth_stop_pocket() {
 }
 
 module cutter_arm_outline_2d() {
+    difference() {
     union() {
             // Narrow front neck carries the transverse hinge pin.
             translate([0, (hinge_front_inset-cutter_arm_neck_length)/2])
@@ -704,6 +705,28 @@ module cutter_arm_outline_2d() {
                        cutter_arm_end_length/2])
                 square([cutter_arm_end_width, cutter_arm_end_length], center=true);
     }
+    opposite_trim_2d();
+    }
+}
+
+// Shared contour in arm coordinates; reused on the trolley in assembly coordinates.
+module opposite_trim_2d() {
+    // Keep a wall outside the guide pockets while removing the unused palm area.
+    trim_outer = max(cutter_arm_body_width, cutter_arm_end_width)/2;
+    trim_inner = max(trim_outer-cutter_arm_opposite_trim,
+                     fin_spacing/2+fin_thickness/2+fin_slot_clearance+body_edge_radius+3);
+    trim_start_y = -cutter_arm_neck_length-10;
+    trim_end_y = -cutter_arm_length+hinge_front_inset;
+    if (cutter_arm_opposite_trim > 0)
+        scale([-cutter_side_sign, 1])
+            polygon(concat(
+                [for(i=[0:48])
+                    let(t=i/48, blend=t*t*(3-2*t))
+                    [trim_outer-(trim_outer-trim_inner)*blend,
+                     trim_start_y+(trim_end_y-trim_start_y)*t]],
+                [[trim_inner, trim_end_y-10],
+                 [trim_outer+20, trim_end_y-10],
+                 [trim_outer+20, trim_start_y]]));
 }
 
 // Arm is centred on the hinge axis; the free end extends toward -Y.
@@ -711,8 +734,9 @@ module cutter_arm_centered() {
     difference() {
         union() {
             translate([0, 0, -cutter_arm_thickness/2])
-                comfortable_plate(cutter_arm_thickness, bed_on_top=true) cutter_arm_outline_2d();
+                comfortable_plate(cutter_arm_thickness) cutter_arm_outline_2d();
             cutter_fork();
+            palm_dome();
         }
         rotate([0, 90, 0])
             cylinder(d=hinge_pin_diameter+2*hinge_hole_clearance,
@@ -723,6 +747,38 @@ module cutter_arm_centered() {
     }
 }
 
+// Offset the palm support toward the scoring wheel, with a longer slope toward the hinge.
+module palm_dome() {
+    if (grip_dome_height > 0) {
+        cx = 0;
+        cy = -0.56*cutter_arm_length;
+        rx = cutter_arm_body_width/2-body_corner_radius-2;
+        ry = 0.34*cutter_arm_length;
+        px = cutter_local_x;
+        py = cutter_local_y+10;
+        rings = $preview ? 32 : 48;
+        sectors = $preview ? 96 : 144;
+        // Nested elliptical rings converge on the offset crest. No clipped sides.
+        points = concat([[px, py, grip_dome_height+eps]],
+            [for (i=[1:rings], j=[0:sectors-1])
+                let(t=i/rings, a=360*j/sectors)
+                [(1-t)*px+t*(cx+rx*cos(a)),
+                 (1-t)*py+t*(cy+ry*sin(a)),
+                 eps+grip_dome_height*pow(1-t*t, 2)]],
+            [[cx, cy, 0]]);
+        bottom = 1+rings*sectors;
+        faces = concat(
+            [for(j=[0:sectors-1]) [0, 1+j, 1+(j+1)%sectors]],
+            [for(i=[0:rings-2], j=[0:sectors-1])
+                let(a=1+i*sectors+j, b=1+i*sectors+(j+1)%sectors,
+                    c=b+sectors, d=a+sectors) [a,d,c,b]],
+            [for(j=[0:sectors-1])
+                [bottom, 1+(rings-1)*sectors+(j+1)%sectors,
+                 1+(rings-1)*sectors+j]]);
+        translate([0, 0, cutter_arm_thickness/2-eps])
+            polyhedron(points=points, faces=faces, convexity=10);
+    }
+}
 // Sweep each running bearing into arm coordinates over its complete movement.
 // Separate pockets preserve the material between the wheel tracks.
 module running_bearing_reliefs() {
