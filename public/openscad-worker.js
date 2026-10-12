@@ -68,7 +68,8 @@ function mergeBinStl(buffers) {
   return out.buffer;
 }
 
-async function compileStl(files, main, vars, preview, logs) {
+async function compileStl(files, main, vars, preview, logs, allowEmpty = false) {
+  const logStart = logs.length;
   const instance = await OpenSCAD({
     noInitialRun: true,
     print: (t) => logs.push(String(t)),
@@ -94,6 +95,13 @@ async function compileStl(files, main, vars, preview, logs) {
     ...Object.entries(vars || {}).flatMap(([k, v]) => [`-D${k}=${formatDefine(v)}`]),
   ];
   const exitCode = instance.callMain(args);
+  const callLogs = logs.slice(logStart);
+  // An optional assembly group may be absent in older or customized SCAD files.
+  // Keep its position in the parts array so subsequent colors remain aligned.
+  if (allowEmpty && callLogs.some((line) => /Current top level object is empty\./.test(line)) &&
+      !callLogs.some((line) => /\bERROR:/.test(line))) {
+    return new ArrayBuffer(84);
+  }
   if (exitCode) {
     throw new Error(usefulLog(logs) || `OpenSCAD exit ${exitCode}`);
   }
@@ -144,7 +152,8 @@ self.onmessage = async (event) => {
       const parts = [];
       for (const name of names) {
         parts.push(
-          await compileStl(inputFiles, inputMain, { ...vars, part: name }, preview, logs)
+          await compileStl(inputFiles, inputMain, { ...vars, part: name }, preview, logs,
+            name === "nuts" || name === "washers")
         );
       }
       const stl = mergeBinStl(parts);

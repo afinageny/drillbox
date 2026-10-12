@@ -15,6 +15,7 @@ guide_side = "right"; // [right, left, both]
 // Deck length along the guide. Its width is twice cut_offset, keeping the cutter centered.
 body_width = 100; // [70:1:140]
 body_height = 10; // [8:1:16]
+wheel_drop = 1; // [0:0.25:4] Lower wheels and cutter relative to the body.
 body_edge_radius = 7; // [2:0.5:10]
 deck_corner_radius = 7; // [2:0.5:12]
 // Distance from the rule's near long side to the scoring line.
@@ -24,23 +25,26 @@ front_wheel_spacing = 29.5; // [16:0.5:29.5] Spacing left/right across the carri
 skirt_thickness = 3; // [2:0.5:6]
 skirt_tile_clearance = 1; // [0.5:0.5:4]
 rear_u_clearance = 0.25; // [0:0.05:2] Axial clearance between cutter spacers and U-wall forks.
+rear_fork_thickness = 5; // [3:0.5:8] Reinforced cutter support walls and bridge.
 rear_u_opening_scale = 2; // [1:0.1:3] U-opening width relative to its previous width.
 rear_wheel_edge_clearance = 0.1; // [0:0.1:2] Gap between the cutter rim and the rear outer edge.
 
 /* [Front wheels] */
-front_wheel_radius = 10; // [6:0.5:16]
+front_wheel_radius = 11; // [6:0.5:16]
 front_wheel_width = 8; // [3:0.5:16]
-front_wheel_hole_radius = 3.3; // [1:0.25:6] Axle diameter plus radial running clearance.
+front_wheel_hole_radius = 4; // [1:0.25:6] 8 mm bearing bore.
 
 /* [Rear scoring wheel] */
 cutter_radius = 11; // [6:0.5:18]
-cutter_width = 3; // [1:0.25:8]
-cutter_hole_radius = 3.3; // [1:0.25:6] Axle diameter plus radial running clearance.
+cutter_width = 5; // [1:0.25:8]
+cutter_hole_radius = 3; // [1:0.25:6] 6 mm cutter bore.
 
 /* [Axle snap fit] */
-axle_diameter = 6; // [3:0.5:10] Smooth axle pin diameter.
+axle_diameter = 5.5; // [3:0.5:10] Cutter axle with clearance in its 6 mm bore.
+front_axle_diameter = 7.5; // [3:0.5:10] Bearing axle with clearance in its 8 mm bore.
 axle_hole_clearance = 0.25; // [0:0.05:0.8] Clearance in wheel bores and axle seats.
-axle_snap_gap = 5.5; // [3:0.1:5.8] Open throat width; smaller than the axle for a press fit.
+axle_snap_gap = 5; // [3:0.1:5.8] Cutter snap throat.
+front_axle_snap_gap = 7; // [3:0.1:9] Bearing snap throat.
 fork_thickness = 3; // [2:0.5:6]
 axle_head_diameter = 9; // [7:0.5:14] Integral end heads retain the axle laterally.
 axle_head_thickness = 1.5; // [1:0.1:3]
@@ -67,7 +71,8 @@ wheel_right_x = front_wheel_spacing/2;
 cut_x = 0;
 front_z = front_wheel_radius;
 cutter_z = cutter_radius;
-deck_z = 2 * max(front_wheel_radius, cutter_radius);
+deck_z = 2 * max(front_wheel_radius, cutter_radius)+wheel_drop;
+effective_skirt_clearance = skirt_tile_clearance+wheel_drop;
 body_span = 2 * cut_offset;
 body_mid_x = 0;
 rail_length = 190;
@@ -83,13 +88,13 @@ fork_top = deck_z;
 // The U-wall forks sit just outside the rear cutter washers.
 rear_fork_side_reach = cutter_width/2 + washer_disc_thickness + 0.1;
 rear_u_inner_x = (rear_fork_side_reach + rear_u_clearance)*rear_u_opening_scale;
-rear_u_outer_x = rear_u_inner_x + skirt_thickness;
+rear_u_outer_x = rear_u_inner_x + rear_fork_thickness;
 rear_u_inner_y = cutter_radius+wheel_clearance;
-rear_u_outer_y = rear_u_inner_y+skirt_thickness;
+rear_u_outer_y = rear_u_inner_y+rear_fork_thickness;
 rear_axle_spacer_thickness = rear_u_inner_x-rear_fork_side_reach-rear_u_clearance;
 front_ear_offset = front_wheel_width/2 + washer_disc_thickness + fork_thickness/2 + 0.25;
 front_axle_halfspan = front_wheel_spacing/2 + front_ear_offset + fork_thickness/2;
-rear_axle_halfspan = rear_u_inner_x + skirt_thickness;
+rear_axle_halfspan = rear_u_inner_x + rear_fork_thickness;
 
 assert(rail_width > 0 && rail_height > 0);
 assert(front_wheel_radius > front_wheel_hole_radius);
@@ -117,6 +122,8 @@ assert(axle_diameter/2 + axle_hole_clearance <= min(front_wheel_hole_radius,cutt
        "Axle does not fit through the wheel bores");
 assert(axle_snap_gap < axle_diameter,
        "Snap-fit throat must be narrower than the axle diameter");
+assert(front_axle_diameter/2+axle_hole_clearance <= front_wheel_hole_radius);
+assert(front_axle_snap_gap < front_axle_diameter);
 assert(axle_head_diameter > axle_diameter && axle_head_thickness > 0 && axle_end_clearance >= 0,
        "Axle end heads must be larger than the shaft and sit beyond the outer fork faces");
 assert(washer_outer_radius > axle_diameter/2 + axle_hole_clearance,
@@ -161,7 +168,7 @@ module rounded_deck() {
 module fork_pair(x, y, radius, width) {
     // Leave room for a washer between the wheel and each fork ear.
     ear_offset = width/2 + washer_disc_thickness + fork_thickness/2 + 0.25;
-    ear_bottom = max(1, radius - axle_diameter/2 - 2);
+    ear_bottom = max(1, radius - front_axle_diameter/2 - 2);
     for (sx = [-1, 1]) {
         difference() {
             hull() {
@@ -172,13 +179,13 @@ module fork_pair(x, y, radius, width) {
             }
             translate([x + sx*ear_offset, y, radius]) rotate([0, 90, 0])
                 cylinder(h=fork_thickness+0.2,
-                         d=axle_diameter+2*axle_hole_clearance, center=true);
+                         d=front_axle_diameter+2*axle_hole_clearance, center=true);
             // The narrow throat flexes as the smooth axle is pressed upward.
             slot_bottom = ear_bottom-1;
             slot_top = radius+eps;
             translate([x + sx*ear_offset, y,
                        (slot_bottom+slot_top)/2])
-                cube([fork_thickness+0.3, axle_snap_gap,
+                cube([fork_thickness+0.3, front_axle_snap_gap,
                       slot_top-slot_bottom], center=true);
         }
     }
@@ -198,15 +205,15 @@ module carriage_body() {
 // A continuous skirt ties the full-length guide faces together. In plan view,
 // the rear-open U-shaped skirt wraps around the cutter and its axle snap seats.
 module skirt_frame() {
-    skirt_height = deck_z-skirt_tile_clearance;
-    u_fork_x = rear_u_inner_x+skirt_thickness/2;
+    skirt_height = deck_z-effective_skirt_clearance;
+    u_fork_x = rear_u_inner_x+rear_fork_thickness/2;
     u_leg_center_y = (-body_width/2+cutter_axle_y)/2;
     u_leg_length = cutter_axle_y+body_width/2;
     union() {
         difference() {
             union() {
                 // Full perimeter skirt; remove its straight rear bridge at the U opening.
-                translate([0, 0, skirt_tile_clearance])
+                translate([0, 0, effective_skirt_clearance])
                     linear_extrude(height=skirt_height)
                         difference() {
                             difference() {
@@ -221,7 +228,7 @@ module skirt_frame() {
                                         2*skirt_thickness+2*eps], center=true);
                         }
                 // Flat Π-shaped bridge and side rails leave the cutter opening open below.
-                translate([0, cutter_axle_y, skirt_tile_clearance])
+                translate([0, cutter_axle_y, effective_skirt_clearance])
                     linear_extrude(height=skirt_height)
                         difference() {
                             translate([0, rear_u_outer_y/2])
@@ -229,22 +236,22 @@ module skirt_frame() {
                             translate([0, (rear_u_inner_y-eps)/2])
                                 square([2*rear_u_inner_x, rear_u_inner_y+eps], center=true);
                         }
-                translate([0, 0, skirt_tile_clearance])
+                translate([0, 0, effective_skirt_clearance])
                     linear_extrude(height=skirt_height)
                         for (side = [-1, 1])
                             translate([side*u_fork_x, u_leg_center_y])
-                                square([skirt_thickness, u_leg_length], center=true);
+                                square([rear_fork_thickness, u_leg_length], center=true);
             }
             // One continuous pair of lower-open sockets cuts through the joined U walls.
             for (side = [-1, 1]) {
                 translate([side*u_fork_x, cutter_axle_y, cutter_z]) rotate([0,90,0])
                     cylinder(d=axle_diameter+2*axle_hole_clearance,
-                             h=skirt_thickness+2*eps, center=true,
+                             h=rear_fork_thickness+2*eps, center=true,
                              $fn=32);
                 translate([side*u_fork_x, cutter_axle_y,
-                           (cutter_z+skirt_tile_clearance)/2])
-                    cube([skirt_thickness+2*eps, axle_snap_gap,
-                          cutter_z-skirt_tile_clearance+eps], center=true);
+                           (cutter_z+effective_skirt_clearance)/2])
+                    cube([rear_fork_thickness+2*eps, axle_snap_gap,
+                          cutter_z-effective_skirt_clearance+eps], center=true);
             }
             // The front bridge wraps around both support wheels.
             for (x = [wheel_left_x, wheel_right_x])
@@ -257,11 +264,11 @@ module skirt_frame() {
 
 // Smooth axles are separate parts. The wheels are assembled onto them first,
 // then the wheel-and-axle units press upward into the carriage snap forks.
-module axle_pin_with_heads(y, z, support_halfspan) {
+module axle_pin_with_heads(y, z, support_halfspan, diameter) {
     total_halfspan = support_halfspan+axle_end_clearance+axle_head_thickness;
     color(axle_color) union() {
         translate([0, y, z]) rotate([0,90,0])
-            cylinder(d=axle_diameter, h=2*total_halfspan, center=true);
+            cylinder(d=diameter, h=2*total_halfspan, center=true);
         for (side = [-1, 1])
             translate([side*(support_halfspan+axle_end_clearance+axle_head_thickness/2),
                        y, z]) rotate([0,90,0])
@@ -270,11 +277,11 @@ module axle_pin_with_heads(y, z, support_halfspan) {
 }
 
 module front_axle_pin() {
-    axle_pin_with_heads(front_axle_y, front_z, front_axle_halfspan);
+    axle_pin_with_heads(front_axle_y, front_z, front_axle_halfspan, front_axle_diameter);
 }
 
 module rear_axle_pin() {
-    axle_pin_with_heads(cutter_axle_y, cutter_z, rear_axle_halfspan);
+    axle_pin_with_heads(cutter_axle_y, cutter_z, rear_axle_halfspan, axle_diameter);
 }
 
 module axle_pins() {
@@ -304,7 +311,7 @@ module washers() {
                 difference() {
                     cylinder(r=washer_outer_radius, h=washer_disc_thickness,
                              center=true, $fn=48);
-                    cylinder(d=axle_diameter+2*axle_hole_clearance,
+                    cylinder(d=front_axle_diameter+2*axle_hole_clearance,
                              h=washer_disc_thickness+2*eps, center=true, $fn=32);
                 }
         for (sx = [-1, 1])

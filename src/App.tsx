@@ -169,7 +169,7 @@ export function App() {
   const sheet = useMemo(() => sheetCutList(vars, params), [vars, params]);
 
   const run = useCallback(
-    (preview: boolean, now = false) => {
+    (preview: boolean, now = false, download = false) => {
       window.clearTimeout(debounce.current);
       const start = () => {
         job.current.worker?.terminate();
@@ -178,7 +178,7 @@ export function App() {
         setBusy(true);
         setErr(false);
         setStatus(preview ? "Preview…" : "Render…");
-        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=10`, {
+        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=11`, {
           type: "module",
         });
         job.current.worker = worker;
@@ -204,6 +204,7 @@ export function App() {
           setErr(false);
           setDiags([]);
           setStatus(preview ? "Preview ready" : "Render ready");
+          if (download) saveStl(ev.data.stl);
         };
         worker.onerror = (e) => {
           if (job.current.id !== id) return;
@@ -298,7 +299,15 @@ export function App() {
 
   function exportStl() {
     if (!stl) return;
-    const blob = new Blob([stl], { type: "model/stl" });
+    if (job.current.preview) {
+      run(false, true, true);
+      return;
+    }
+    saveStl(stl);
+  }
+
+  function saveStl(data: ArrayBuffer) {
+    const blob = new Blob([data], { type: "model/stl" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${title.replace(/\.scad$/i, "") || "model"}.stl`;

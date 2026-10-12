@@ -305,14 +305,19 @@ module threaded_hole(length, nominal_d, pitch, pilot_ratio) {
     major_d = nominal_d+thread_clearance;
     pilot_d = nominal_d*pilot_ratio;
     hole_ratio = pilot_d/major_d;
-    union() {
-        cylinder(d=pilot_d, h=length, center=true);
-        threaded_ridge(major_d, pitch, length, hole_ratio);
-    }
+    if ($preview)
+        cylinder(d=major_d, h=length, center=true);
+    else
+        union() {
+            cylinder(d=pilot_d, h=length, center=true);
+            threaded_ridge(major_d, pitch, length, hole_ratio);
+        }
 }
 
 module threaded_shaft(length, nominal_d, pitch, pilot_ratio) {
-    union() {
+    if ($preview)
+        cylinder(d=nominal_d, h=length, center=true);
+    else union() {
         cylinder(d=nominal_d*pilot_ratio, h=length, center=true);
         threaded_ridge(nominal_d, pitch, length, pilot_ratio);
     }
