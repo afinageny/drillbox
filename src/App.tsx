@@ -178,7 +178,7 @@ export function App() {
         setBusy(true);
         setErr(false);
         setStatus(preview ? "Preview…" : "Render…");
-        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=11`, {
+        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=13`, {
           type: "module",
         });
         job.current.worker = worker;

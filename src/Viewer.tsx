@@ -45,13 +45,15 @@ function colorFor(part: string, index: number, count: number, vars: Vars = {}, d
     ];
     return trolleyColors[index] ?? FALLBACK.other;
   }
-  if (/^tile_carriage-/i.test(downloadName) && count >= 6) {
+  if (/^(tile_carriage|tile-carriage-next)-/i.test(downloadName) && count >= 6) {
     const carriageColors = [
       hexColor(vars.guide_color, 0x1677e8),
       hexColor(vars.carriage_color, 0xed8b35),
       hexColor(vars.front_wheel_color, 0x424b54),
       hexColor(vars.cutter_color, 0xb8bec4),
       hexColor(vars.washer_color, 0xb9bec4),
+      hexColor(vars.axle_color, 0x252a30),
+      hexColor(vars.side_bearing_color, 0xb8bec4),
       hexColor(vars.axle_color, 0x252a30),
     ];
     return carriageColors[index] ?? FALLBACK.other;

@@ -1,6 +1,6 @@
 # Parametric OpenSCAD Models
 
-This repository contains five configurable OpenSCAD projects and a browser-based playground for previewing, rendering, and exporting them. All model dimensions are in millimetres, and the models are self-contained without external OpenSCAD libraries.
+This repository contains six configurable OpenSCAD projects and a browser-based playground for previewing, rendering, and exporting them. All model dimensions are in millimetres, and the models are self-contained without external OpenSCAD libraries.
 
 ## Online playground
 
@@ -12,6 +12,7 @@ Direct links:
 - [Sliding-lid storage box](https://afinageny.github.io/drillbox/?file=lidbox.scad)
 - [Shuttlecock tube](https://afinageny.github.io/drillbox/?file=shuttlecock_tube.scad)
 - [Tile scoring carriage](https://afinageny.github.io/drillbox/?file=tile_carriage.scad)
+- [Tile scoring carriage — next version](https://afinageny.github.io/drillbox/?file=tile-carriage-next.scad)
 - [Tile cutter carriage variant](https://afinageny.github.io/drillbox/?file=tile-cutter.scad)
 
 Use **Preview** while adjusting parameters, **Render** for final geometry, **STL** to export the currently selected part, and **PNG** to save the current camera view.
@@ -81,6 +82,16 @@ File: [`openscad/tile_carriage.scad`](openscad/tile_carriage.scad)
 A compact, hand-pressed three-point carriage for scoring a large tile alongside a rectangular guide rule. Two matching front wheels and a rear scoring disc contact the tile. The rounded upper shell and perimeter skirt form one continuous body, with the same rounded outline carried down the skirt and a rounded upper edge. Viewed from below, a narrow U-shaped rear skirt wraps around the cutter and opens toward the rear so the cutter is visible from behind. Tapered ties connect the U to the side skirts. Wheels and cutter ride on smooth, separate axle pins that press upward from below into snap-fit fork seats. Integral heads on each axle end keep it from sliding sideways, and the washers are separate parts. The preview omits the tile so the carriage underside remains visible. Select whether the rule is on the left, right, or both sides. The browser preview colors the rule, carriage, wheels, cutter, washers, and axles separately, with each color adjustable in the customizer.
 
 The rule defaults to 50 × 10 mm, the front wheels to 20 mm diameter, and the cutting line to the middle of the 55 mm carriage width. Wheel and cutter dimensions, guide clearance, skirt clearance, top edge radius, corner radius, and axle/fork sizes are editable in the browser customizer. The body and guide are conceptual first-pass geometry; verify the actual cutter and wheel dimensions before printing a functional part.
+
+### Tile scoring carriage — next version
+
+File: [`openscad/tile-carriage-next.scad`](openscad/tile-carriage-next.scad)
+
+The next version uses identical 22 mm outside diameter, 8 mm width and 8 mm bore bearings for the two support wheels and two side rollers. Their dimensions share the bearing_diameter, bearing_width and bearing_bore parameters. The body has a symmetric rectangular plate, 114 mm long, 52 mm wide and 10 mm thick, without edge rounding. A rectangular skirt sits 2 mm above the tile: side walls are 3 mm thick, and front/rear bands are 14 mm thick, centered on the wheel axes (114 mm overall skirt length). Both long sides are inset 1.5 mm from the bearing contact planes; the scoring offset remains 27.5 mm.
+
+Wheel and cutter pockets and closed axle bores are built directly into the thick end bands; there are no separate forks or snap slots. Each plastic screw axle has a single accessible hex head, a smooth shank and a coarse printed thread confined to its far end. Insert wheels and washers from below, then insert and screw the axle from the side opposite the rule. The receiving thread is blind, on the rule side. The thread is a custom 2 mm pitch profile, not a standard metric thread. Thread clearances are adjustable. Select axle_print to export both screws standing on their heads. With guide_side set to both, the left rule must be removed for screw access. The side walls are continuous without roller windows; their lower edges sit above the side bearings with 0.5 mm clearance by default. Side-bearing pillars have narrow inner-ring shoulders and blind 6.8 mm pilot holes, 14 mm deep, for tapping M8 from below. The preview shows simplified screws and lower spacers, with no upper nuts or protruding fasteners. Helical threads are not modeled. The pilot diameter and depth are adjustable. The side rollers clear the tile by 2.5 mm. Their longitudinal positions track the front wheels with a 5 mm edge gap (side_front_gap) and the cutter with a 1 mm edge gap (side_rear_gap). Default centers are at Y = -27 and +23 mm, 50 mm apart. The guide_side parameter selects the mounting side (two rollers per side in both mode).
+
+The support-wheel and cutter axes are 100 mm apart by default. The plate follows the skirt outline without ledges, extending 7 mm beyond each axle; each 22 mm disc projects 4 mm beyond this 114 mm outline (122 mm overall wheel envelope). The wheel_overhang parameter adjusts axle placement relative to body_width; the plate follows the end bands. The scoring disc retains separate dimensions.
 
 ### Tile cutter bearing trolley
 

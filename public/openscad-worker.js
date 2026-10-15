@@ -161,9 +161,12 @@ self.onmessage = async (event) => {
       return;
     }
 
-    const hasTileCarriage = /(?:^|\/)tile_carriage\.scad$/i.test(normalizedMain);
+    const hasTileCarriage = /(?:^|\/)(?:tile_carriage|tile-carriage-next)\.scad$/i.test(normalizedMain);
     if (hasTileCarriage && part === "assembly") {
       const names = ["guide", "carriage", "front_wheels", "cutter", "washers", "axles"];
+      if (/(?:^|\/)tile-carriage-next\.scad$/i.test(normalizedMain)) {
+        names.push("side_bearings", "side_fasteners");
+      }
       const parts = [];
       for (const name of names) {
         parts.push(
