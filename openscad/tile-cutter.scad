@@ -15,7 +15,7 @@ show_guide = true;
 /* [Trolley outline] */
 trolley_length = 80; // [50:1:140]
 trolley_thickness = 10; // [6:0.5:20]
-trolley_end_width = 13; // [13:1:60] Width between the outer threaded faces of the wheel mounts.
+trolley_end_width = 22; // [13:1:60] Width between the outer threaded faces of the wheel mounts.
 trolley_end_tab_length = 24; // [13:1:35] Must be longer than the wheel diameter.
 side_wing_extension = 23; // [5:1:25] Matches the 96 mm arm body and encloses the M8 nut pocket.
 side_wing_length = 80; // [40:1:120] At least the central plate length; no corner cutouts.
@@ -30,7 +30,7 @@ bearing_width = 8; // [3:0.5:12]
 bearing_bore_diameter = 8; // [3:0.1:12]
 bearing_radial_clearance = 0.4; // [0.1:0.1:1]
 bearing_axial_clearance = 0.3; // [0.1:0.1:1]
-bearing_edge_margin = 5; // [0.5:0.5:8] Reserves space for the screw head inside the guide width.
+bearing_edge_margin = 0.5; // [0.5:0.5:8] Running bearing setback from the guide edge; screw heads may overhang.
 
 /* [Side guide bearings] */
 side_bearing_side = "left"; // [right,left] Two fixed guide bearings are on the operator's side.
@@ -81,14 +81,16 @@ cut_side = "left"; // [right,left] Right-handed operation cuts on the operator's
 cutter_end = "near"; // [near,far] Longitudinal position relative to the operator.
 cutter_rest_clearance = 1.5; // [0:0.25:4] Cutter gap above the tile before pressing.
 cutter_depth_limit = 0.3; // [0:0.1:1.5] Maximum cutter penetration into the tile.
-cut_line_offset = 10; // [5:1:40] Distance from the selected guide face to the cutting line.
+cut_line_offset = 11; // [5:1:40] Distance from the selected guide face to the cutting line.
 cutter_end_inset = 8; // [8:1:30] Distance from the free end of the arm to the cutter axis.
+cutter_axle_shift = 3.5; // [0:0.5:6] Move the cutter toward the trolley without moving the fork root.
 cutter_outer_diameter = 22; // [10:0.5:40]
 cutter_width = 5; // [1:0.5:8]
 cutter_bore_diameter = 6; // [3:0.1:10]
-cutter_fork_thickness = 6; // [4:0.5:10]
+cutter_fork_thickness = 3; // [3:0.5:10] Narrow cheeks clear the trolley screw heads without side notches.
 cutter_fork_axial_clearance = 0.3; // [0.1:0.1:1]
-cutter_fork_depth = 14; // [10:1:24]
+cutter_fork_depth = 28; // [14:1:40] Wide triangular roots along the guide.
+cutter_fork_wheel_clearance = 2; // [0.2:0.1:4] Radial clearance in the solid bridge above the wheel.
 cutter_fork_boss_diameter = 12; // [8:1:20]
 cutter_axle_clearance = 0.25; // [0.1:0.05:0.8]
 cutter_axle_end_clearance = 0.4; // [0.1:0.1:1]
@@ -174,7 +176,7 @@ arm_x_sign = cutter_end_sign < 0 ? 1 : -1;
 // Turning the arm 180 degrees also mirrors its local X direction.
 cutter_side_sign = cutter_world_side_sign*arm_x_sign;
 cutter_local_x = cutter_side_sign*(guide_width/2+cut_line_offset);
-cutter_local_y = -cutter_arm_length+hinge_front_inset+cutter_end_inset;
+cutter_local_y = -cutter_arm_length+hinge_front_inset+cutter_end_inset+cutter_axle_shift;
 // At zero arm angle the wheel touches the same work plane as the guide.
 cutter_axle_local_z = cutter_radius+cutter_rest_clearance-hinge_axis_z;
 // Solve the downward arm rotation at the requested wheel penetration.
@@ -203,8 +205,8 @@ assert(trolley_end_tab_length > bearing_outer_diameter+2*bearing_radial_clearanc
        "Front/rear wheel mount length must exceed the wheel diameter plus clearance");
 assert(bearing_inner_x-mount_outer_x >= bearing_axial_clearance,
        "Wheel mount is too wide for the bearings to stay near the guide edges");
-assert(bearing_center_x+bearing_width/2+screw_head_thickness <= guide_width/2,
-       "Screw heads extend beyond the guide width; move bearings inward");
+assert(bearing_center_x+bearing_width/2 <= guide_width/2,
+       "Running bearings must remain fully supported by the guide");
 assert(mount_outer_x > thread_engagement,
        "Wheel mount is too narrow for the selected threaded engagement");
 assert(thread_engagement < trolley_thickness,
@@ -264,10 +266,13 @@ assert(cutter_bore_diameter >= cutter_axle_diameter,
 assert(cutter_end_inset > cutter_radius/2 &&
        cutter_end_inset+cutter_radius/2 < cutter_arm_length-hinge_front_inset,
        "Cutter axis must remain inside the wide arm section");
+// The cutter may overlap the trolley in plan view while remaining below its plate.
 assert(abs(hinge_axis_y+arm_x_sign*(cutter_local_y*cos(depth_stop_angle)-
        cutter_axle_local_z*sin(depth_stop_angle))) >
-       effective_side_wing_length/2+cutter_radius,
-       "Pressed cutter wheel hits the trolley edge: move it toward the free end");
+       effective_side_wing_length/2+cutter_radius ||
+       hinge_axis_z+cutter_local_y*sin(depth_stop_angle)+
+       cutter_axle_local_z*cos(depth_stop_angle)+cutter_radius < body_bottom_z,
+       "Pressed cutter wheel overlaps the trolley plate");
 assert(cutter_fork_boss_diameter >
        cutter_axle_diameter+2*cutter_axle_clearance,
        "Cutter axle hole leaves too little material in the fork");
@@ -669,48 +674,47 @@ module single_side_nut() {
         }
 }
 
-module cutter_fork_cheek(x, hole_diameter) {
-    r = min(body_edge_radius, cutter_fork_thickness/2-eps, 1-eps);
+// A single rounded blank makes the cheeks and upper web one continuous surface.
+module cutter_fork() {
+    gap_width = cutter_width+2*cutter_fork_axial_clearance;
+    width = gap_width+2*cutter_fork_thickness;
+    r = min(body_edge_radius, 1-eps);
     difference() {
-        if (r > 0)
+        if(r > 0)
             minkowski() {
-                cutter_fork_cheek_core(x, r);
-                sphere(r=r, $fn=$preview ? 16 : 32);
+                cutter_fork_blank(width, r);
+                sphere(r=r, $fn=$preview ? 24 : 48);
             }
-        else cutter_fork_cheek_core(x, 0);
-        translate([x, cutter_local_y, cutter_axle_local_z])
-            rotate([0, 90, 0]) {
-                if (hole_diameter < cutter_axle_diameter)
-                    threaded_hole(cutter_fork_thickness+2*eps,
-                                  cutter_axle_diameter, cutter_thread_pitch,
-                                  cutter_thread_pilot_ratio);
-                else
-                    cylinder(d=hole_diameter,
-                             h=cutter_fork_thickness+2*eps, center=true);
-            }
+        else cutter_fork_blank(width, 0);
+        translate([cutter_local_x, cutter_local_y, cutter_axle_local_z])
+            rotate([0,90,0])
+                cylinder(d=cutter_outer_diameter+2*cutter_fork_wheel_clearance,
+                         h=gap_width, center=true);
+        translate([cutter_outer_cheek_x, cutter_local_y, cutter_axle_local_z])
+            rotate([0,90,0])
+                cylinder(d=cutter_axle_diameter+2*cutter_axle_clearance,
+                         h=cutter_fork_thickness+2*eps, center=true);
+        translate([cutter_inner_cheek_x, cutter_local_y, cutter_axle_local_z])
+            rotate([0,90,0])
+                threaded_hole(cutter_fork_thickness+2*eps, cutter_axle_diameter,
+                              cutter_thread_pitch, cutter_thread_pilot_ratio);
     }
 }
 
-// Inset core keeps the original fork envelope after adding the roundover.
-module cutter_fork_cheek_core(x, r) {
+module cutter_fork_blank(width, r) {
+    // Keep the free-end edge inside the platform; widen toward the trolley only.
+    root_depth = min(cutter_fork_depth,
+                     2*(cutter_end_inset-body_edge_radius));
+    root_extension = root_depth/2;
     hull() {
-        translate([x, cutter_local_y, -cutter_arm_thickness/2+1])
-            cube([cutter_fork_thickness-2*r, cutter_fork_depth-2*r, 2-2*r], center=true);
-        translate([x, cutter_local_y, cutter_axle_local_z])
-            rotate([0, 90, 0])
-                cylinder(d=cutter_fork_boss_diameter-2*r,
-                         h=cutter_fork_thickness-2*r, center=true);
-        }
+        translate([cutter_local_x, cutter_local_y-cutter_axle_shift+root_extension/2,
+                   -cutter_arm_thickness/2+1])
+            cube([width-2*r, root_depth+root_extension-2*r, 2-2*r], center=true);
+        translate([cutter_local_x, cutter_local_y, cutter_axle_local_z])
+            rotate([0,90,0])
+                cylinder(d=cutter_fork_boss_diameter-2*r, h=width-2*r, center=true);
+    }
 }
-
-module cutter_fork() {
-    // Both cheeks follow the cutter bore: outer clearance, inner thread.
-    cutter_fork_cheek(cutter_outer_cheek_x,
-                      cutter_axle_diameter+2*cutter_axle_clearance);
-    cutter_fork_cheek(cutter_inner_cheek_x,
-                      cutter_axle_diameter*cutter_thread_pilot_ratio);
-}
-
 module depth_stop_pocket() {
     // A roomy pocket receives the stop; only its roof sets the pressing limit.
     slot_width = depth_stop_width+2*depth_stop_clearance;
@@ -842,9 +846,16 @@ module running_bearing_reliefs() {
                         translate([side*bearing_center_x,
                                    end*mount_station_y-hinge_axis_y,
                                    body_bottom_z+axle_local_z-hinge_axis_z])
+                            union() {
                             rotate([0, 90, 0])
                                 cylinder(d=bearing_outer_diameter+2*bearing_radial_clearance,
                                          h=bearing_width+2*bearing_axial_clearance, center=true);
+                            translate([side*(bearing_width/2+screw_head_thickness/2),0,0])
+                                rotate([0,90,0])
+                                    cylinder(d=screw_head_diameter+2*bearing_radial_clearance,
+                                             h=screw_head_thickness+2*bearing_axial_clearance,
+                                             center=true);
+                            }
 }
 
 module cutter_wheel_local() {
