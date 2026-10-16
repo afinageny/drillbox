@@ -165,12 +165,13 @@ self.onmessage = async (event) => {
     if (hasTileCarriage && part === "assembly") {
       const names = ["guide", "carriage", "front_wheels", "cutter", "washers", "axles"];
       if (/(?:^|\/)tile-carriage-next\.scad$/i.test(normalizedMain)) {
-        names.push("side_bearings", "side_fasteners");
+        names.push("side_bearings", "side_fasteners", "magnets", "magnet_screws");
       }
       const parts = [];
       for (const name of names) {
         parts.push(
-          await compileStl(inputFiles, inputMain, { ...vars, part: name }, preview, logs)
+          await compileStl(inputFiles, inputMain, { ...vars, part: name }, preview, logs,
+            name === "magnets" || name === "magnet_screws")
         );
       }
       const stl = mergeBinStl(parts);

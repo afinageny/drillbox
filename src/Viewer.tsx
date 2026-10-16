@@ -55,6 +55,8 @@ function colorFor(part: string, index: number, count: number, vars: Vars = {}, d
       hexColor(vars.axle_color, 0x252a30),
       hexColor(vars.side_bearing_color, 0xb8bec4),
       hexColor(vars.axle_color, 0x252a30),
+      0xb8bec4,
+      hexColor(vars.axle_color, 0x252a30),
     ];
     return carriageColors[index] ?? FALLBACK.other;
   }

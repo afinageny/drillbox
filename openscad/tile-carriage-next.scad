@@ -2,12 +2,12 @@
 // Units: millimetres. The wheels are simplified as one-piece annular discs.
 
 /* [View] */
-part = "assembly"; // [assembly, guide, carriage, front_wheels, cutter, front_axle, rear_axle, axles, washers, front_wheel, side_bearings, side_fasteners, axle_print]
+part = "assembly"; // [assembly, guide, carriage, front_wheels, cutter, front_axle, rear_axle, axles, washers, front_wheel, side_bearings, side_fasteners, axle_print, magnets, magnet_screws, magnet_screws_print]
 
 /* [Guide rule] */
 // Rectangular rule lies flat on the tile: width across the tile, height above it.
 rail_width = 50; // [20:1:100]
-rail_height = 10; // [5:1:30]
+rail_height = 20; // [5:1:30]
 guide_clearance = 0; // [0:0.1:1]
 guide_side = "right"; // [right, left, both]
 
@@ -17,14 +17,36 @@ bearing_width = 8; // [4:0.5:12] Width of all four bearings.
 bearing_bore = 8; // [3:1:12] Bore of all four bearings.
 
 /* [Side guide bearings] */
-side_front_gap = 5; // [1.5:0.5:15] Longitudinal edge gap to the front wheels.
-side_rear_gap = 1; // [0.5:0.5:15] Longitudinal edge gap to the rear cutter.
+side_front_gap = 4; // [1.5:0.5:15] Longitudinal edge gap to the front wheels.
+side_rear_gap = 0; // [0:0.5:15] Longitudinal projected edge gap to the rear cutter.
 side_plastic_clearance = 1.5; // [0.5:0.1:3] Plastic setback from the rule face.
 side_bearing_clearance = 0.5; // [0.2:0.1:1] Radial pocket and outer-ring axial clearance.
+side_bearing_tile_clearance = 2.5; // [2.5:0.5:6] Minimum bearing bottom clearance when the rule is too low for centering.
 side_mount_diameter = 14; // [8:0.5:20]
 side_bolt_clearance = 0.4; // [0.2:0.1:0.8] Clearance through the inner-ring shoulder.
 side_thread_depth = 14; // [8:1:20] Blind pilot depth for tapping from below.
 side_thread_pilot = 6.8; // [5:0.1:8] Pilot diameter for the M8 tapped mount.
+
+/* [Magnets] */
+enable_magnets = true;
+magnet_front_corner_inset = 6; // [5.5:0.5:12] Inward offset from the front axle to clear its screw.
+magnet_rear_corner_inset = 0; // [0:0.5:8] Inward offset from the cutter axle.
+magnet_diameter = 10; // [5:0.5:20] Outside diameter.
+magnet_thickness = 3; // [1:0.5:8]
+magnet_hole_diameter = 3; // [1:0.1:6] Approximate through-hole diameter from the reference photo.
+magnet_countersink_diameter = 6; // [2:0.1:10] Approximate outer diameter from the reference photo.
+magnet_countersink_wall_angle = 45; // [15:1:75] Wall angle to the hole axis; full cone angle is twice this value.
+magnet_fit_clearance = 0.15; // [0.05:0.05:0.4] Radial pocket clearance.
+magnet_face_recess = 0.1; // [0:0.1:2] Magnet face setback behind the plastic outer face; 0 is flush.
+magnet_holder_wall = 1.75; // [1.5:0.25:3] Radial carrier wall allowance.
+magnet_screw_diameter = 2.7; // [2:0.1:3] Smooth shank clears the magnet hole.
+magnet_screw_thread_length = 4; // [3:0.5:8]
+magnet_screw_thread_pitch = 1; // [0.75:0.25:1.5]
+magnet_screw_thread_depth = 0.35; // [0.2:0.05:0.5]
+magnet_screw_thread_clearance = 0.12; // [0.05:0.01:0.25]
+magnet_screw_head_clearance = 0.3; // [0.1:0.1:0.6] Diametral countersink clearance.
+magnet_mount_back_wall = 1.5; // [1:0.5:3] Closed wall behind the blind thread.
+magnet_block_tile_clearance = 2; // [0.5:0.5:4] Minimum height of the magnet holder above the tile.
 
 /* [Carriage] */
 // Deck length along the guide. Its width is twice cut_offset, keeping the cutter centered.
@@ -32,12 +54,12 @@ body_width = 100; // [70:1:180]
 body_height = 10; // [8:1:16]
 wheel_drop = 1; // [0:0.25:4] Lower wheels and cutter relative to the body.
 // Distance from the rule's near long side to the scoring line.
-cut_offset = 27.5; // [26.5:0.5:40]
+cut_offset = 30; // [26.5:0.5:40]
 wheel_overhang = 0.5; // [0:0.05:0.5] Fraction of wheel diameter outside the deck at each end.
 front_wheel_spacing = 29.5; // [16:0.5:29.5] Spacing left/right across the carriage.
 rear_u_clearance = 0.25; // [0:0.05:2] Axial clearance between cutter spacers and U-wall forks.
 rear_fork_thickness = 5; // [3:0.5:8] Reinforced cutter support walls and bridge.
-rear_u_opening_scale = 2; // [1:0.1:3] U-opening width relative to its previous width.
+rear_u_opening_scale = 1; // [1:0.1:3] Cutter pocket width multiplier; 1 fits the cutter and thin washers.
 
 /* [Rectangular skirt] */
 skirt_side_thickness = 3; // [2:0.5:6]
@@ -116,7 +138,7 @@ rear_axle_halfspan = rear_u_inner_x + rear_fork_thickness;
 side_bearing_r = side_bearing_diameter/2;
 side_bearing_x = cut_offset-side_bearing_r;
 // Keep room below for the bolt head even with an 8 mm wide bearing on a 10 mm rule.
-side_bearing_z = max(rail_height/2, side_bearing_width/2+2.5);
+side_bearing_z = max(rail_height/2,side_bearing_width/2+side_bearing_tile_clearance);
 side_bearing_bottom = side_bearing_z-side_bearing_width/2;
 side_bearing_top = side_bearing_z+side_bearing_width/2;
 side_mount_bottom = side_bearing_top+side_bearing_clearance;
@@ -125,10 +147,34 @@ side_spacer_diameter = side_bearing_bore+2;
 side_front_y = front_axle_y-front_wheel_radius-side_bearing_r-side_front_gap;
 side_rear_y = cutter_axle_y+cutter_radius+side_bearing_r+side_rear_gap;
 side_bearing_positions = [side_rear_y, side_front_y];
+magnet_holder_diameter = magnet_diameter+2*magnet_holder_wall;
+magnet_front_x = cut_offset-side_plastic_clearance-magnet_face_recess;
+magnet_rear_x = magnet_front_x-magnet_thickness;
+magnet_holder_inner_x = magnet_rear_x-magnet_screw_thread_length-magnet_mount_back_wall;
+magnet_screw_head_diameter = magnet_countersink_diameter-magnet_screw_head_clearance;
+magnet_screw_head_depth = (magnet_screw_head_diameter-magnet_screw_diameter)/(2*tan(magnet_countersink_wall_angle));
+magnet_center_z = max(rail_height/2,magnet_diameter/2+skirt_tile_clearance);
+// Magnets sit near the end corners; the front one clears the support-wheel axle.
+magnet_positions = [cutter_axle_y+magnet_rear_corner_inset,
+                    front_axle_y-magnet_front_corner_inset];
+magnet_cone_depth = (magnet_countersink_diameter-magnet_hole_diameter)/
+                    (2*tan(magnet_countersink_wall_angle));
+if (enable_magnets) {
+    assert(magnet_hole_diameter > 0 && magnet_hole_diameter < magnet_countersink_diameter);
+    assert(magnet_countersink_diameter < magnet_diameter && magnet_cone_depth < magnet_thickness);
+    assert(magnet_screw_diameter < magnet_hole_diameter);
+    assert(magnet_screw_head_diameter > magnet_hole_diameter);
+    assert(magnet_screw_head_depth < magnet_thickness);
+    assert(magnet_screw_thread_depth < magnet_screw_diameter/3);
+    assert(magnet_center_z-magnet_holder_diameter/2 > 0, "Magnet carrier touches the tile");
+    assert(magnet_positions[0]+magnet_holder_diameter/2 < side_rear_y-side_bearing_r &&
+           magnet_positions[1]-magnet_holder_diameter/2 > side_front_y+side_bearing_r,
+           "Corner magnets overlap side bearings; reduce magnet diameter or adjust the corner offsets");
+}
 assert(side_front_y-side_rear_y > side_bearing_diameter+side_bearing_clearance,
        "Side bearings overlap; increase body length or reduce the end gap");
 assert(side_front_gap > wheel_clearance+side_bearing_clearance);
-assert(side_rear_gap > 0);
+assert(side_rear_gap >= 0);
 assert(side_front_y+side_bearing_r+side_bearing_clearance < front_axle_y-skirt_end_thickness/2,
        "Front side bearing overlaps the end skirt band");
 assert(side_rear_y-side_bearing_r-side_bearing_clearance > cutter_axle_y+skirt_end_thickness/2,
@@ -203,15 +249,27 @@ module carriage_body() {
         union() {
             flat_deck();
             integrated_skirt();
+            if (enable_magnets) magnet_holders();
             for (side = side_sides, y = side_bearing_positions)
                 translate([side*side_bearing_x, y, 0]) {
                     translate([0, 0, side_mount_bottom])
-                        cylinder(d=side_mount_diameter, h=deck_z-side_mount_bottom+0.2);
+                        translate([-side_mount_diameter/2,-side_mount_diameter/2,0])
+                            cube([side_mount_diameter,side_mount_diameter,
+                                  deck_z-side_mount_bottom+0.2]);
                     translate([0, 0, side_bearing_top])
                         cylinder(d=side_spacer_diameter, h=side_bearing_clearance+eps);
                 }
         }
         side_mount_holes();
+        // Preserve the wheel-and-washer rotation space.
+        for (x=[wheel_left_x,wheel_right_x])
+            translate([x,front_axle_y,front_z]) rotate([0,90,0])
+                cylinder(r=front_wheel_radius+wheel_clearance,
+                         h=front_wheel_width+2*washer_disc_thickness+0.5,center=true);
+        // Cut axle sockets through the complete body, including the corner magnet blocks.
+        screw_axle_socket(front_axle_y,front_z,front_axle_diameter,front_thread_x,front_thread_length);
+        screw_axle_socket(cutter_axle_y,cutter_z,axle_diameter,rear_thread_x,rear_thread_length);
+        if (enable_magnets) magnet_mount_holes();
     }
 }
 
@@ -224,6 +282,82 @@ module side_mount_holes() {
             translate([0, 0, side_mount_bottom-eps])
                 cylinder(d=side_thread_pilot, h=side_thread_depth+eps);
         }
+}
+
+// Carriers have rule-side pockets and blind threaded backing.
+module magnet_frame(side, y) {
+    translate([side*magnet_holder_inner_x, y, magnet_center_z])
+        rotate([0, side*90, 0]) children();
+}
+
+module magnet_screw_frame(side, y) {
+    translate([side*magnet_front_x, y, magnet_center_z])
+        rotate([0, -side*90, 0]) children();
+}
+
+module magnet_holders() {
+    holder_depth = cut_offset-side_plastic_clearance-magnet_holder_inner_x;
+    // Separate blocks at the front and rear magnetic attraction stations.
+    for (side=side_sides, y=magnet_positions)
+        intersection() {
+            hull() {
+                magnet_frame(side,y)
+                    cylinder(d=magnet_holder_diameter,h=holder_depth);
+                translate([side*(magnet_holder_inner_x+holder_depth/2),y,deck_z])
+                    cube([holder_depth,magnet_holder_diameter,0.4],center=true);
+            }
+            translate([side*(magnet_holder_inner_x+holder_depth/2),y,
+                       (magnet_block_tile_clearance+deck_z+0.4)/2])
+                cube([holder_depth+2*eps,magnet_holder_diameter+2*eps,
+                      deck_z+0.4-magnet_block_tile_clearance],center=true);
+        }
+}
+
+module magnet_mount_holes() {
+    for (side=side_sides, y=magnet_positions) {
+        translate([side*magnet_rear_x,y,magnet_center_z]) rotate([0,side*90,0])
+            cylinder(d=magnet_diameter+2*magnet_fit_clearance,
+                     h=magnet_thickness+magnet_face_recess+eps);
+        magnet_screw_frame(side,y) translate([0,0,magnet_thickness])
+            printable_thread(magnet_screw_diameter,magnet_screw_thread_length+0.2,
+                magnet_screw_thread_clearance,0.08,
+                magnet_screw_thread_pitch,magnet_screw_thread_depth);
+    }
+}
+
+module magnets() {
+    if (enable_magnets) color("#b8bec4")
+        for (side=side_sides, y=magnet_positions)
+            translate([side*magnet_rear_x,y,magnet_center_z]) rotate([0,side*90,0])
+                difference() {
+                    cylinder(d=magnet_diameter,h=magnet_thickness);
+                    translate([0,0,-eps]) cylinder(d=magnet_hole_diameter,h=magnet_thickness+2*eps);
+                    translate([0,0,magnet_thickness-magnet_cone_depth])
+                        cylinder(d1=magnet_hole_diameter,d2=magnet_countersink_diameter,
+                                 h=magnet_cone_depth+eps);
+                }
+}
+
+module magnet_screw_shape() {
+    difference() {
+        union() {
+            cylinder(d1=magnet_screw_head_diameter,d2=magnet_screw_diameter,
+                     h=magnet_screw_head_depth);
+            translate([0,0,magnet_screw_head_depth-eps])
+                cylinder(d=magnet_screw_diameter,h=magnet_thickness-magnet_screw_head_depth+eps);
+            translate([0,0,magnet_thickness])
+                printable_thread(magnet_screw_diameter,magnet_screw_thread_length,
+                                 0,0,magnet_screw_thread_pitch,magnet_screw_thread_depth);
+        }
+        // Screwdriver slot opens on the rule-facing, flush countersunk head.
+        translate([0,0,0.3-eps])
+            cube([magnet_screw_head_diameter+1,0.8,0.6],center=true);
+    }
+}
+
+module magnet_screws() {
+    if (enable_magnets) color(axle_color)
+        for (side=side_sides, y=magnet_positions) magnet_screw_frame(side,y) magnet_screw_shape();
 }
 
 module side_bearings() {
@@ -290,7 +424,7 @@ module screw_axle_socket(y, z, diameter, thread_x, thread_length) {
     thread_start = axle_outer_halfspan+thread_x;
     axle_frame(y, z) {
         translate([0, 0, -eps])
-            cylinder(d=diameter+2*axle_hole_clearance, h=thread_start+2*eps);
+            cylinder(d=diameter+2*axle_hole_clearance, h=thread_start+4*eps);
         translate([0, 0, thread_start])
             printable_thread(diameter, thread_length+0.2,
                              axle_thread_clearance, axle_thread_axial_clearance);
@@ -298,9 +432,9 @@ module screw_axle_socket(y, z, diameter, thread_x, thread_length) {
 }
 
 // Swept trapezoidal thread, with identical phase on screw and socket.
-module printable_thread(diameter, length, radial_extra=0, axial_extra=0) {
-    core_r = diameter/2-axle_thread_depth;
-    pitch = axle_thread_pitch;
+module printable_thread(diameter, length, radial_extra=0, axial_extra=0,
+                        pitch= axle_thread_pitch, depth=axle_thread_depth) {
+    core_r = diameter/2-depth;
     start = pitch*0.4;
     finish = length-pitch*0.4;
     turns = (finish-start)/pitch;
@@ -388,7 +522,7 @@ module washers() {
                     cylinder(d=axle_diameter+2*axle_hole_clearance,
                              h=washer_disc_thickness+2*eps, center=true, $fn=32);
         // Separate spacer discs fill the wider U opening and keep the cutter centered.
-        for (sx = [-1, 1])
+        if (rear_axle_spacer_thickness > eps) for (sx = [-1, 1])
             translate([sx*(rear_fork_side_reach+rear_u_clearance/2+
                             rear_axle_spacer_thickness/2),
                        cutter_axle_y, cutter_z]) rotate([0,90,0])
@@ -422,6 +556,8 @@ module assembly() {
     axle_pins();
     side_bearings();
     side_fasteners();
+    magnets();
+    magnet_screws();
 }
 
 if (part == "assembly") assembly();
@@ -442,5 +578,10 @@ else if (part == "axles") axle_pins();
 else if (part == "washers") washers();
 else if (part == "side_bearings") side_bearings();
 else if (part == "side_fasteners") side_fasteners();
+else if (part == "magnets") magnets();
+else if (part == "magnet_screws") magnet_screws();
+else if (part == "magnet_screws_print")
+    for (i=[0:2*len(side_sides)-1])
+        translate([i*(magnet_screw_head_diameter+3),0,0]) magnet_screw_shape();
 else if (part == "cutter") cutter_disc();
 else if (part == "front_wheel") annular_wheel(front_wheel_radius, front_wheel_width, front_wheel_hole_radius);
