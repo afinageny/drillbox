@@ -162,16 +162,19 @@ self.onmessage = async (event) => {
     }
 
     const hasTileCarriage = /(?:^|\/)(?:tile_carriage|tile-carriage-next)\.scad$/i.test(normalizedMain);
-    if (hasTileCarriage && part === "assembly") {
-      const names = ["guide", "carriage", "front_wheels", "cutter", "washers", "axles"];
-      if (/(?:^|\/)tile-carriage-next\.scad$/i.test(normalizedMain)) {
+    const isNextTileCarriage = /(?:^|\/)tile-carriage-next\.scad$/i.test(normalizedMain);
+    if (hasTileCarriage && (part === "assembly" || (isNextTileCarriage && part === "print"))) {
+      const names = part === "print"
+        ? ["print_body", "print_axles", "print_washers", "print_side_fasteners", "print_magnet_screws"]
+        : ["guide", "carriage", "front_wheels", "cutter", "washers", "axles"];
+      if (isNextTileCarriage && part === "assembly") {
         names.push("side_bearings", "side_fasteners", "magnets", "magnet_screws");
       }
       const parts = [];
       for (const name of names) {
         parts.push(
           await compileStl(inputFiles, inputMain, { ...vars, part: name }, preview, logs,
-            name === "magnets" || name === "magnet_screws")
+            name === "magnets" || name === "magnet_screws" || name === "print_magnet_screws")
         );
       }
       const stl = mergeBinStl(parts);

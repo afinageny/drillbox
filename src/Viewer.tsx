@@ -27,6 +27,15 @@ function partColors(vars: Vars = {}) {
 }
 
 function colorFor(part: string, index: number, count: number, vars: Vars = {}, downloadName = "") {
+  if (/^tile-carriage-next-/i.test(downloadName) && part === "print") {
+    return [
+      hexColor(vars.carriage_color, 0xed8b35),
+      hexColor(vars.axle_color, 0x252a30),
+      hexColor(vars.washer_color, 0xb9bec4),
+      hexColor(vars.axle_color, 0x252a30),
+      hexColor(vars.axle_color, 0x252a30),
+    ][index] ?? FALLBACK.other;
+  }
   if (/^tile-cutter-/i.test(downloadName) && count >= 2) {
     if (part === "print") return [
       hexColor(vars.trolley_color, 0xed8b35),
@@ -201,8 +210,16 @@ export function Viewer({
     const oz = -world.min.z;
     for (const { geom: g, index } of geoms) {
       g.translate(ox, oy, oz);
+      const isGuide = /^tile-carriage-next-/i.test(downloadName) &&
+        (part === "guide" || (part === "assembly" && buffers.length > 1 && index === 0));
+      const guideOpacity = Number(vars?.guide_opacity ?? 0.35);
+      const opacity = isGuide && Number.isFinite(guideOpacity)
+        ? Math.max(0, Math.min(1, guideOpacity)) : 1;
       const mat = new THREE.MeshStandardMaterial({
         color: colorFor(part, index, buffers.length, vars, downloadName),
+        transparent: opacity < 1,
+        opacity,
+        depthWrite: opacity === 1,
         metalness: 0.05,
         roughness: 0.45,
       });

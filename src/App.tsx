@@ -10,16 +10,13 @@ import {
   defaultProject,
   encodeText,
   fileText,
-  isSingleScad,
   loadProjectFromUrl,
   MAX_SHARE_URL,
   pickCatalogFile,
   readVarsFromParams,
   requestedCatalogFile,
-  clearShareUrl,
   scadPaths,
   shareUrl,
-  syncProjectUrl,
 } from "./project";
 
 type Job = {
@@ -39,7 +36,7 @@ function savedModel() {
 
 function rememberModel(name: string) {
   try { localStorage.setItem(MODEL_KEY, name); }
-  catch { /* The URL still preserves the selection without storage. */ }
+  catch { /* Selection still works without storage. */ }
 }
 
 function readEditorRatio() {
@@ -138,8 +135,6 @@ export function App() {
   }
   const job = useRef<Job & { worker?: Worker }>({ id: 0, preview: true });
   const debounce = useRef<number>(0);
-  const urlDebounce = useRef<number>(0);
-  const skipUrlSync = useRef(true);
   const editorRef = useRef<{
     revealLineInCenter: (line: number) => void;
     setPosition: (pos: { lineNumber: number; column: number }) => void;
@@ -178,7 +173,7 @@ export function App() {
         setBusy(true);
         setErr(false);
         setStatus(preview ? "Preview…" : "Render…");
-        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=15`, {
+        const worker = new Worker(`${import.meta.env.BASE_URL}openscad-worker.js?v=16`, {
           type: "module",
         });
         job.current.worker = worker;
@@ -258,20 +253,6 @@ export function App() {
   }, [diags, openPath, source]);
 
   useEffect(() => {
-    if (!isSingleScad(files)) return;
-    window.clearTimeout(urlDebounce.current);
-    urlDebounce.current = window.setTimeout(() => {
-      if (skipUrlSync.current && !Object.keys(vars).length) {
-        skipUrlSync.current = false;
-        return;
-      }
-      skipUrlSync.current = false;
-      syncProjectUrl(files, main, vars, scadCatalog);
-    }, 350);
-    return () => window.clearTimeout(urlDebounce.current);
-  }, [files, main, vars]);
-
-  useEffect(() => {
     applyTheme(theme);
   }, [theme]);
 
@@ -316,8 +297,6 @@ export function App() {
   }
 
   function resetToDefault() {
-    skipUrlSync.current = true;
-    window.clearTimeout(urlDebounce.current);
     const model =
       pickCatalogFile(scadCatalog, main) ?? {
         name: main,
@@ -331,16 +310,12 @@ export function App() {
     setDiags([]);
     setErr(false);
     setStatus("Model defaults restored");
-    clearShareUrl();
     rememberModel(model.name);
-    syncProjectUrl(fresh.files, fresh.main, {}, scadCatalog);
   }
 
   function loadCatalogModel(name: string) {
     const hit = pickCatalogFile(scadCatalog, name);
     if (!hit) return;
-    skipUrlSync.current = true;
-    window.clearTimeout(urlDebounce.current);
     const fresh = defaultProject(hit.source, hit.name);
     setStl(null);
     setParts(null);
@@ -352,25 +327,22 @@ export function App() {
     setErr(false);
     setStatus(hit.name);
     rememberModel(hit.name);
-    // Persist immediately: a reload must not race the debounced editor sync.
-    syncProjectUrl(fresh.files, fresh.main, {}, scadCatalog);
   }
 
-  async function copyShareLink() {
+  async function copyUrl() {
     const url = shareUrl(files, main, vars);
     if (url.length > MAX_SHARE_URL) {
       setErr(true);
       setStatus("Project is too large for a URL");
       return;
     }
-    history.replaceState(null, "", url);
     try {
       await navigator.clipboard.writeText(url);
       setErr(false);
       setStatus("Link copied");
     } catch {
-      setErr(false);
-      setStatus("Link updated in the address bar");
+      setErr(true);
+      setStatus("Could not copy URL. Allow clipboard access and try again.");
     }
   }
 
@@ -414,8 +386,8 @@ export function App() {
         <button disabled={!stl} onClick={exportStl}>
           STL
         </button>
-        <button disabled={busy} onClick={copyShareLink}>
-          Link
+        <button onClick={copyUrl} title="Copy a URL containing the current code and parameters">
+          copyUrl
         </button>
         <button disabled={busy} onClick={resetToDefault} title="Restore defaults for the selected model">
           Reset

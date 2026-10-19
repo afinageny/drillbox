@@ -44,34 +44,6 @@ export function pickCatalogFile(
   return { name, source: catalog[name] };
 }
 
-export function catalogFileUrl(name: string, vars: Vars = {}): string {
-  const url = new URL(window.location.href);
-  url.search = "";
-  url.hash = "";
-  url.searchParams.set("file", name);
-  for (const [key, value] of Object.entries(vars)) {
-    url.searchParams.set(`d.${key}`, String(value));
-  }
-  return url.toString();
-}
-
-export function syncProjectUrl(
-  files: Record<string, Uint8Array>,
-  main: string,
-  vars: Vars,
-  catalog: Record<string, string>
-): boolean {
-  if (isSingleScad(files) && catalog[main] === fileText(files, main)) {
-    const next = new URL(catalogFileUrl(main, vars));
-    if (location.pathname === next.pathname && location.search === next.search && location.hash === next.hash) {
-      return true;
-    }
-    history.replaceState(null, "", next);
-    return true;
-  }
-  return replaceShareUrl(files, main, vars);
-}
-
 export function readVarsFromParams(params: URLSearchParams = readUrlParams()): Vars {
   const vars: Vars = {};
   for (const [key, value] of params) {
@@ -140,41 +112,11 @@ export function pickMain(files: Record<string, Uint8Array>, requested?: string |
 
 export const MAX_SHARE_URL = 120000;
 
-export function isSingleScad(files: Record<string, Uint8Array>): boolean {
-  const names = Object.keys(files);
-  return names.length === 1 && names[0].toLowerCase().endsWith(".scad");
-}
-
 export function shareUrl(files: Record<string, Uint8Array>, main: string, vars: Vars = {}): string {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = projectToHash(files, main, vars);
   return url.toString();
-}
-
-/** Keep the address bar in sync for a single .scad. Returns false if skipped (zip / too long). */
-export function replaceShareUrl(
-  files: Record<string, Uint8Array>,
-  main: string,
-  vars: Vars = {}
-): boolean {
-  if (!isSingleScad(files)) return false;
-  const url = shareUrl(files, main, vars);
-  if (url.length > MAX_SHARE_URL) return false;
-  const next = new URL(url);
-  if (location.pathname === next.pathname && location.search === next.search && location.hash === next.hash) {
-    return true;
-  }
-  history.replaceState(null, "", next);
-  return true;
-}
-
-export function clearShareUrl() {
-  const url = new URL(window.location.href);
-  url.search = "";
-  url.hash = "";
-  if (location.search === "" && location.hash === "") return;
-  history.replaceState(null, "", url);
 }
 
 export function projectToHash(files: Record<string, Uint8Array>, main: string, vars: Vars = {}): string {
