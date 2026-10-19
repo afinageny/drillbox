@@ -83,7 +83,7 @@ cut_offset = 30; // [26.5:0.5:40]
 body_free_side_extension = 5; // [0:0.5:12] Widen opposite the rule, preserving the 30 mm cut offset.
 wheel_overhang = 0.5; // [0:0.05:0.5] Fraction of wheel diameter outside the deck at each end.
 front_wheel_spacing = 29.5; // [16:0.5:29.5] Spacing left/right across the carriage.
-rear_u_clearance = 0.25; // [0:0.05:2] Axial clearance between cutter spacers and U-wall forks.
+rear_u_clearance = 0.025; // [0:0.025:2] Per-side cutter stack clearance; 0.025 gives 0.05 mm total for sanding to fit.
 rear_fork_thickness = 5; // [3:0.5:8] Reinforced cutter support walls and bridge.
 rear_u_opening_scale = 1; // [1:0.1:3] Cutter pocket width multiplier; 1 fits the cutter and thin washers.
 
@@ -156,12 +156,12 @@ front_axle_y = body_width/2-front_wheel_radius+2*front_wheel_radius*wheel_overha
 cutter_axle_y = -body_width/2+cutter_radius-2*cutter_radius*wheel_overhang;
 fork_top = deck_z;
 // The U-wall forks sit just outside the rear cutter washers.
-rear_fork_side_reach = cutter_width/2 + washer_disc_thickness + 0.1;
+rear_fork_side_reach = cutter_width/2 + washer_disc_thickness;
 rear_u_inner_x = (rear_fork_side_reach + rear_u_clearance)*rear_u_opening_scale;
 rear_u_outer_x = rear_u_inner_x + rear_fork_thickness;
 rear_u_inner_y = cutter_radius+wheel_clearance;
 rear_u_outer_y = rear_u_inner_y+rear_fork_thickness;
-rear_axle_spacer_thickness = rear_u_inner_x-rear_fork_side_reach-rear_u_clearance;
+rear_axle_spacer_thickness = max(0,rear_u_inner_x-rear_fork_side_reach-rear_u_clearance);
 front_ear_offset = front_wheel_width/2 + washer_disc_thickness + fork_thickness/2 + 0.25;
 front_axle_halfspan = front_wheel_spacing/2 + front_ear_offset + fork_thickness/2;
 rear_axle_halfspan = rear_u_inner_x + rear_fork_thickness;
@@ -268,7 +268,7 @@ assert(wheel_overhang >= 0 && wheel_overhang <= 0.5,
 assert(side_mount_bottom+side_thread_depth < deck_z+body_height-2, "Blind thread needs at least 2 mm of closed roof");
 assert(side_screw_journal_diameter < side_bearing_bore);
 assert(bearing_thread_diameter-2*thread_external_radial_compensation <= min(side_bearing_bore,2*front_wheel_hole_radius));
-assert(rear_u_inner_x > rear_fork_side_reach,
+assert(rear_u_inner_x >= rear_fork_side_reach,
        "Rear U skirt does not clear the cutter fork stack");
 assert(rear_axle_spacer_thickness >= 0,
        "Rear U opening is too narrow for the cutter axle spacers");
@@ -344,7 +344,7 @@ module carriage_body() {
         for (x=[wheel_left_x,wheel_right_x])
             translate([x,front_axle_y,front_z]) rotate([0,90,0])
                 cylinder(r=front_wheel_radius+wheel_clearance,
-                         h=front_wheel_width+2*washer_disc_thickness+0.5,center=true);
+                         h=front_wheel_width+2*washer_disc_thickness+0.1,center=true);
         // Cut axle sockets through the complete body, including the corner magnet blocks.
         front_axle_socket();
         screw_axle_socket(cutter_axle_y,cutter_z,axle_diameter,rear_thread_x,rear_thread_length);
@@ -513,7 +513,7 @@ module integrated_skirt() {
         for (x = [wheel_left_x, wheel_right_x])
             translate([x, front_axle_y, front_z]) rotate([0, 90, 0])
                 cylinder(r=front_wheel_radius+wheel_clearance,
-                         h=front_wheel_width+2*washer_disc_thickness+0.5, center=true);
+                         h=front_wheel_width+2*washer_disc_thickness+0.1, center=true);
         translate([0, cutter_axle_y, cutter_z]) rotate([0, 90, 0])
             cylinder(r=cutter_radius+wheel_clearance, h=2*rear_u_inner_x, center=true);
         front_axle_socket();
@@ -666,7 +666,7 @@ module washers() {
     side_lower_washers();
     color(washer_color) {
         for (wheel_x = [wheel_left_x, wheel_right_x], sx = [-1, 1])
-            translate([wheel_x+sx*(front_wheel_width/2+washer_disc_thickness/2+0.1),
+            translate([wheel_x+sx*(front_wheel_width/2+washer_disc_thickness/2),
                        front_axle_y, front_z]) rotate([0,90,0])
                 difference() {
                     cylinder(r=front_washer_radius, h=washer_disc_thickness,
@@ -675,7 +675,7 @@ module washers() {
                              h=washer_disc_thickness+2*eps, center=true, $fn=32);
                 }
         for (sx = [-1, 1])
-            translate([sx*(cutter_width/2+washer_disc_thickness/2+0.1),
+            translate([sx*(cutter_width/2+washer_disc_thickness/2),
                        cutter_axle_y, cutter_z]) rotate([0,90,0])
                 difference() {
                     cylinder(r=cutter_washer_radius, h=washer_disc_thickness,
