@@ -6,6 +6,7 @@ import { applyVarsToSource, applyVarToSource, parseCustomizer, type Param, type 
 import { formatDiag, parseOpenScadDiagnostics, sameFile, type Diag } from "./diagnostics";
 import { Viewer } from "./Viewer";
 import { formatMm, sheetCutList } from "./sheetCut";
+import { parameterLayout } from "./parameterLayout";
 import {
   defaultProject,
   encodeText,
@@ -148,14 +149,9 @@ export function App() {
   const params = useMemo(() => parseCustomizer(mainSource), [mainSource]);
   const title = (main.split("/").pop() ?? "OpenSCAD").replace(/\.scad$/i, "");
   const part = String(vars.part ?? params.find((p) => p.name === "part")?.initial ?? "assembly");
-  const grouped = useMemo(() => {
-    const g: Record<string, Param[]> = {};
-    for (const p of params) {
-      if (p.name === "lid_open" && part !== "assembly") continue;
-      (g[p.group] ??= []).push(p);
-    }
-    return g;
-  }, [params, part]);
+  const { basic: grouped, advanced } = useMemo(
+    () => parameterLayout(params, main, part), [params, main, part]
+  );
   const previewVars = useMemo(() => {
     const next: Vars = {};
     for (const p of params) next[p.name] = p.initial;
@@ -346,6 +342,23 @@ export function App() {
     }
   }
 
+  function renderParamGroups(groups: Record<string, Param[]>) {
+    return Object.entries(groups).map(([group, list]) => (
+      <section key={group}>
+        <h2>{group}</h2>
+        {list.map((p) => (
+          <ParamField
+            key={p.name}
+            param={boundParam(p, vars, params)}
+            value={valueOf(p)}
+            onChange={setVar}
+          />
+        ))}
+        {group === "Windows" && sheet ? <SheetCutInfo sheet={sheet} /> : null}
+      </section>
+    ));
+  }
+
   return (
     <div className="app">
       <header className="toolbar">
@@ -503,20 +516,13 @@ export function App() {
           />
         </div>
         <aside className="params">
-          {Object.entries(grouped).map(([group, list]) => (
-            <section key={group}>
-              <h2>{group}</h2>
-              {list.map((p) => (
-                <ParamField
-                  key={p.name}
-                  param={boundParam(p, vars, params)}
-                  value={valueOf(p)}
-                  onChange={setVar}
-                />
-              ))}
-              {group === "Windows" && sheet ? <SheetCutInfo sheet={sheet} /> : null}
-            </section>
-          ))}
+          {renderParamGroups(grouped)}
+          {Object.keys(advanced).length > 0 ? (
+            <details className="advanced-params" key={main}>
+              <summary>Расширенные настройки</summary>
+              {renderParamGroups(advanced)}
+            </details>
+          ) : null}
           {sheet && !grouped.Windows ? (
             <section>
               <h2>Sheets</h2>

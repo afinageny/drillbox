@@ -47,6 +47,8 @@ side_plastic_clearance = 1.5; // [0.5:0.1:3] Plastic setback from the rule face.
 side_bearing_clearance = 0.5; // [0.2:0.1:1] Radial pocket and outer-ring axial clearance.
 side_bearing_tile_clearance = 2.5; // [2.5:0.5:6] Minimum bearing bottom clearance when the rule is too low for centering.
 side_mount_diameter = 14; // [8:0.5:20]
+enable_side_mount_ribs = true;
+side_mount_rib_thickness = 3; // [2:0.5:5] One rectangular transverse rib per side-bearing mount.
 side_bolt_clearance = 0.4; // [0.2:0.1:0.8] Clearance through the inner-ring shoulder.
 side_screw_journal_diameter = 7.6; // [6:0.1:8] Smooth bearing journal, separate from the M8 thread.
 side_thread_depth = 14; // [8:1:20] Blind printed-thread socket depth.
@@ -326,6 +328,7 @@ module carriage_body() {
         union() {
             flat_deck();
             integrated_skirt();
+            if (enable_side_mount_ribs) side_mount_ribs();
             if (enable_magnets) magnet_holders();
             for (side = side_sides, y = side_bearing_positions)
                 translate([side*side_bearing_x, y, 0]) {
@@ -339,6 +342,7 @@ module carriage_body() {
         }
         }
         magnet_end_corner_reliefs();
+        bolt_end_corner_reliefs();
         side_mount_holes();
         // Preserve the wheel-and-washer rotation space.
         for (x=[wheel_left_x,wheel_right_x])
@@ -349,6 +353,19 @@ module carriage_body() {
         front_axle_socket();
         screw_axle_socket(cutter_axle_y,cutter_z,axle_diameter,rear_thread_x,rear_thread_length);
         if (enable_magnets) magnet_mount_holes();
+    }
+}
+
+// One centered rectangular rib joins each bearing block to the opposite skirt.
+// The underside clears the bearing; side_mount_holes preserves the screw socket.
+module side_mount_ribs() {
+    t = min(side_mount_rib_thickness,side_mount_diameter/3);
+    for (side=side_sides,y=side_bearing_positions) {
+        mount_x = side*(side_bearing_x-side_mount_diameter/2+t/2);
+        wall_x = body_outer_x(-side)+side*skirt_side_thickness/2;
+        translate([(mount_x+wall_x)/2,y,(side_mount_bottom+deck_z+0.2)/2])
+            cube([abs(mount_x-wall_x)+min(t,skirt_side_thickness),
+                  t,deck_z+0.2-side_mount_bottom],center=true);
     }
 }
 
@@ -382,12 +399,14 @@ module magnet_holders() {
         holder_radius = magnet_center_holder_radius;
         holder_center_z = magnet_block_tile_clearance+holder_radius;
         intersection() {
-            hull() {
+            union() {
                 translate([side*magnet_holder_inner_x,y,holder_center_z])
                     rotate([0,side*90,0])
-                        cylinder(r=holder_radius,h=holder_depth);
-                translate([side*(magnet_holder_inner_x+holder_depth/2),y,deck_z])
-                    cube([holder_depth,2*holder_radius,0.4],center=true);
+                        cylinder(r=holder_radius,h=holder_depth,$fn=128);
+                translate([side*(magnet_holder_inner_x+holder_depth/2),y,
+                           (holder_center_z+deck_z+0.2)/2])
+                    cube([holder_depth,2*holder_radius,
+                          deck_z+0.2-holder_center_z],center=true);
             }
             translate([side*(magnet_holder_inner_x+holder_depth/2),y,
                        (magnet_block_tile_clearance+deck_z+0.4)/2])
@@ -410,9 +429,36 @@ module magnet_end_corner_reliefs() {
                 translate([body_mid_x,y+inward*r/2,magnet_block_tile_clearance+r/2-eps/2])
                     cube([body_actual_width+2*eps,r,r+eps],center=true);
                 translate([body_mid_x,y,z]) rotate([0,90,0])
-                    cylinder(r=r,h=body_actual_width+4*eps,center=true);
+                    cylinder(r=r,h=body_actual_width+4*eps,center=true,$fn=128);
             }
         }
+}
+
+// Quarter circles tangent to both the inner end-band face and the skirt bottom.
+// Continue each profile to its wheel pocket and across the front center bridge.
+module bolt_end_corner_reliefs() {
+    r = magnet_center_holder_radius;
+    side = -axle_receiving_side;
+    for (i=[0:1]) {
+        pocket_edge = i == 0 ? rear_u_inner_x :
+            front_wheel_spacing/2+(front_wheel_width+2*washer_disc_thickness+0.1)/2;
+        depth = abs(body_outer_x(side))-pocket_edge+eps;
+        x = body_outer_x(side)-side*depth/2;
+        inward = i == 0 ? 1 : -1;
+        edge_y = i == 0 ? cutter_axle_y+skirt_end_thickness/2 :
+                         front_axle_y-skirt_end_thickness/2;
+        y = edge_y-inward*r;
+        bridge_width = front_wheel_spacing-
+                       (front_wheel_width+2*washer_disc_thickness+0.1);
+        sections = concat([[x,depth]],i == 1 ? [[0,bridge_width]] : []);
+        for (section=sections)
+            difference() {
+                translate([section[0],y+inward*r/2,skirt_tile_clearance+r/2-eps/2])
+                    cube([section[1]+2*eps,r,r+eps],center=true);
+                translate([section[0],y,skirt_tile_clearance+r]) rotate([0,90,0])
+                    cylinder(r=r,h=section[1]+4*eps,center=true,$fn=128);
+            }
+    }
 }
 
 module magnet_mount_holes() {

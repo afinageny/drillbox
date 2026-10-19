@@ -108,6 +108,10 @@ html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(-
 }
 .params h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 14px 0 8px; }
 .params h2:first-child { margin-top: 4px; }
+.advanced-params { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; }
+.advanced-params > summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.advanced-params[open] > summary { margin-bottom: 14px; }
+.advanced-params > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; }
 .field label { color: var(--text); }
 .field .name { color: var(--muted); font-size: 11px; margin-left: 6px; }
