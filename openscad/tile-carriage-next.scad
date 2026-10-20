@@ -17,11 +17,11 @@ guide_side = "right"; // [right, left, both]
 
 /* [Shared wheel bearings] */
 bearing_diameter = 22; // [12:1:32] Outside diameter of both support and side bearings.
-bearing_width = 8; // [4:0.5:12] Width of all four bearings.
+bearing_width = 7; // [4:0.5:12] Width of all four bearings.
 bearing_bore = 8; // [3:1:12] Bore of all four bearings.
 
 /* [Front wheel bearing zone] */
-front_wheel_bearing_diameter = 14; // [9:0.5:20] Bearing contact diameter, also the front washer outside diameter.
+front_wheel_bearing_diameter = 12; // [9:0.5:20] Bearing contact diameter, also the front washer outside diameter.
 
 /* [Shared bearing screw threads] */
 bearing_thread_diameter = 8; // [6:1:10] Nominal metric diameter: M8 for the front axle and side screws.
@@ -31,7 +31,7 @@ bearing_thread_axial_clearance = 0.08; // [0.04:0.02:0.16] Shared axial thread c
 
 /* [Standard screw lengths] */
 front_bolt_length = 60; // [50:5:65] M8 length under the head.
-rear_bolt_length = 50; // [45:5:55] M6 length under the head.
+rear_bolt_length = 33; // [25:1:55] M6 cutter-kit bolt length under the head.
 side_bolt_length = 20; // [16:1:25] M8 length under the head; use low button heads for metal screws.
 magnet_bolt_length = 6; // [5:1:10] M3 countersunk overall length, including the head.
 bolt_bottom_clearance = 0.5; // [0.3:0.1:1] Blind-hole extra depth beyond the bolt tip.
@@ -72,7 +72,7 @@ magnet_screw_thread_pitch = 0.5; // [0.4:0.1:0.8] M3 coarse pitch.
 magnet_screw_thread_clearance = 0.12; // [0.05:0.01:0.25]
 magnet_screw_head_clearance = 0.3; // [0.1:0.1:0.6] Diametral countersink clearance.
 magnet_mount_back_wall = 1.5; // [1:0.5:3] Closed wall behind the blind thread.
-magnet_block_tile_clearance = 2; // [0.5:0.5:4] Minimum height of the magnet holder above the tile.
+magnet_block_tile_clearance = 3; // [0.5:0.5:4] Minimum height of the magnet holder above the tile.
 
 /* [Carriage] */
 // Deck length along the guide. Extra width is added only opposite the active rule.
@@ -92,13 +92,13 @@ rear_u_opening_scale = 1; // [1:0.1:3] Cutter pocket width multiplier; 1 fits th
 /* [Rectangular skirt] */
 skirt_side_thickness = 3; // [2:0.5:6]
 skirt_end_thickness = 14; // [12:1:22] Front and rear bands centered on the wheel axes.
-skirt_tile_clearance = 2; // [1:0.5:4]
+skirt_tile_clearance = 3; // [1:0.5:4]
 
 /* [Rear scoring wheel] */
 cutter_radius = 11; // [6:0.5:18]
-cutter_width = 5; // [1:0.25:8]
+cutter_width = 6; // [1:0.25:8]
 cutter_hole_radius = 3; // [1:0.25:6] 6 mm cutter bore.
-cutter_bearing_diameter = 14; // [7:0.5:20] Bearing contact diameter, also the cutter washer outside diameter.
+cutter_bearing_diameter = 8; // [7:0.5:20] Bearing contact diameter, also the cutter washer outside diameter.
 
 /* [Plastic screw axles] */
 axle_diameter = 5.5; // [3:0.5:10] Cutter axle with clearance in its 6 mm bore.
@@ -224,12 +224,19 @@ assert(side_rear_y-side_bearing_r-side_bearing_clearance > cutter_axle_y+skirt_e
 // The opposite rule is only a reference in both-side view; remove it for screw access.
 axle_outer_halfspan = body_span/2-side_plastic_clearance;
 front_head_halfspan = axle_outer_halfspan+body_free_side_extension;
-function axle_head_halfspan(y) = front_head_halfspan;
+// Recess short cutter bolts while retaining at least the fork thickness of thread.
+rear_thread_x = rear_u_inner_x+0.7;
+rear_head_halfspan = min(front_head_halfspan,
+                        rear_bolt_length-rear_thread_x-max(rear_fork_thickness,3*axle_thread_pitch));
+rear_head_recess_depth = front_head_halfspan-rear_head_halfspan;
+rear_head_recess_diameter = max(axle_head_diameter,2*cutter_thread_diameter)+2*axle_hole_clearance;
+function axle_head_halfspan(y) = y == cutter_axle_y ? rear_head_halfspan : front_head_halfspan;
 function body_outer_x(side) = side*axle_outer_halfspan-(side == -axle_receiving_side ? axle_receiving_side*body_free_side_extension : 0);
 front_thread_x = front_wheel_spacing/2+front_wheel_width/2+washer_disc_thickness+0.75;
-rear_thread_x = rear_u_inner_x+0.7;
 front_thread_length = front_bolt_length-front_head_halfspan-front_thread_x;
-rear_thread_length = rear_bolt_length-front_head_halfspan-rear_thread_x;
+rear_thread_length = rear_bolt_length-rear_head_halfspan-rear_thread_x;
+assert(rear_head_halfspan >= rear_u_outer_x,
+       "Cutter bolt is too short to retain the head-side fork wall");
 assert(front_thread_length >= 3*bearing_thread_pitch, "Front standard bolt is too short for adequate thread engagement");
 assert(rear_thread_length >= 3*axle_thread_pitch, "Cutter standard bolt is too short for adequate thread engagement");
 assert(side_screw_thread_length >= 3*bearing_thread_pitch && side_screw_thread_length+bolt_bottom_clearance <= side_thread_depth, "Side bolt length does not fit its blind socket");
@@ -586,6 +593,9 @@ module screw_axle_socket(y, z, diameter, thread_x, thread_length,
     effective_diameter = is_undef(thread_diameter) ? diameter : thread_diameter;
     thread_start = axle_head_halfspan(y)+thread_x;
     axle_frame(y, z) {
+        if (y == cutter_axle_y && rear_head_recess_depth > 0)
+            translate([0,0,-rear_head_recess_depth-eps])
+                cylinder(d=rear_head_recess_diameter,h=rear_head_recess_depth+eps);
         translate([0, 0, -eps])
             cylinder(d=max(diameter+2*axle_hole_clearance,effective_diameter+0.2),
                      h=thread_start+4*eps);
@@ -649,7 +659,7 @@ module metric_thread(diameter,length,pitch,internal=false,radial_clearance=0,axi
 
 module plastic_screw_axle(y, z, diameter, thread_x, thread_length) {
     color(axle_color) axle_frame(y, z)
-        screw_axle_shape(diameter, thread_x, thread_length);
+        screw_axle_shape(diameter, thread_x, thread_length,head_halfspan=axle_head_halfspan(y));
 }
 
 module screw_axle_shape(diameter, thread_x, thread_length,
@@ -787,7 +797,8 @@ module print_axles() {
         translate([print_x(0),print_y(0),axle_head_thickness])
             front_axle_shape();
         translate([print_x(0),print_y(1),axle_head_thickness])
-            screw_axle_shape(axle_diameter,rear_thread_x,rear_thread_length);
+            screw_axle_shape(axle_diameter,rear_thread_x,rear_thread_length,
+                             head_halfspan=rear_head_halfspan);
     }
 }
 
@@ -852,7 +863,8 @@ else if (part == "axle_print") {
         translate([-axle_head_diameter, 0, axle_head_thickness])
             front_axle_shape();
         translate([axle_head_diameter, 0, axle_head_thickness])
-            screw_axle_shape(axle_diameter, rear_thread_x, rear_thread_length);
+            screw_axle_shape(axle_diameter, rear_thread_x, rear_thread_length,
+                             head_halfspan=rear_head_halfspan);
     }
 }
 else if (part == "front_axle") front_axle_pin();
