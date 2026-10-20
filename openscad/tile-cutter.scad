@@ -405,6 +405,7 @@ module trolley_outline_2d() {
     translate([0, hinge_axis_y])
         rotate(cutter_end_sign > 0 ? 180 : 0)
             opposite_trim_2d();
+    cutter_fork_trolley_clearance_2d();
     }
 }
 
@@ -622,22 +623,23 @@ module trolley_solid() {
     // Cut after joining the hinge feet so their fillets cannot fill the blind threads.
     for (y = [side_bearing_pair_offset-side_bearing_spacing/2, side_bearing_pair_offset+side_bearing_spacing/2])
         side_wheel_mount_cut(y);
-    cutter_fork_trolley_clearance();
     }
 }
 
 // Open corner instead of a fitted well: entry is unobstructed from the end and side.
-module cutter_fork_trolley_clearance() {
+module cutter_fork_trolley_clearance_2d() {
     width = cutter_width+2*(cutter_washer_thickness+cutter_fork_axial_clearance+
                           cutter_fork_thickness);
     root_depth = min(cutter_fork_depth,2*(cutter_end_inset-body_edge_radius));
     inner_x = abs(cutter_local_x)-width/2-0.5;
     end_y = cutter_local_y+0.75*root_depth+2;
-    translate([0,hinge_axis_y,0])
-        rotate([0,0,cutter_end_sign > 0 ? 180 : 0])
-            scale([cutter_side_sign,1,1])
-                translate([inner_x,-200,-100])
-                    cube([200,200+end_y,300]);
+    translate([0,hinge_axis_y])
+        rotate(cutter_end_sign > 0 ? 180 : 0)
+            scale([cutter_side_sign,1])
+                translate([inner_x,-200])
+                    offset(r=body_corner_radius)
+                        offset(delta=-body_corner_radius)
+                            square([200,200+end_y]);
 }
 module bearing_disc() {
     difference() {
