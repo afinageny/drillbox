@@ -52,6 +52,8 @@ function colorFor(part: string, index: number, count: number, vars: Vars = {}, d
       hexColor(vars.cutter_wheel_color, 0xb8bec4),
       hexColor(vars.bolt_color, 0x252a30),
     ];
+    trolleyColors.push(hexColor(vars.cutter_arm_color, 0xd99a32),
+                       hexColor(vars.bolt_color, 0x252a30));
     return trolleyColors[index] ?? FALLBACK.other;
   }
   if (/^(tile_carriage|tile-carriage-next)-/i.test(downloadName) && count >= 6) {

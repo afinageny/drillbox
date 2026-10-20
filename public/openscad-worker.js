@@ -147,13 +147,13 @@ self.onmessage = async (event) => {
     if (hasTileCutter && part === "assembly") {
       const names = [
         "guide", "trolley_placed", "bearings", "bolts", "nuts", "washers", "cutter_arm_placed",
-        "cutter_wheel_placed", "cutter_axle_placed"
+        "cutter_wheel_placed", "cutter_axle_placed", "handle_placed", "handle_stud_placed"
       ];
       const parts = [];
       for (const name of names) {
         parts.push(
           await compileStl(inputFiles, inputMain, { ...vars, part: name }, preview, logs,
-            name === "nuts" || name === "washers")
+            ["nuts", "washers", "handle_placed", "handle_stud_placed"].includes(name))
         );
       }
       const stl = mergeBinStl(parts);
